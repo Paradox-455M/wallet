@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # wallet
 Secure Wallet for file transfering
 =======
