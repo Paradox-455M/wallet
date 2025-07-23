@@ -1,33 +1,18 @@
 const express = require('express');
-const { body } = require('express-validator');
 const authController = require('../controllers/authController');
+const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 
 const router = express.Router();
 
 // @route   POST api/auth/register
 // @desc    Register user
 // @access  Public
-router.post(
-  '/register',
-  [
-    body('email', 'Please include a valid email').isEmail(),
-    body('password', 'Password must be 6 or more characters').isLength({ min: 6 }),
-    body('fullName', 'Full name is required').not().isEmpty(),
-  ],
-  authController.register
-);
+router.post('/register', validateUserRegistration, authController.register);
 
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token (Local login)
 // @access  Public
-router.post(
-  '/',
-  [
-    body('email', 'Please include a valid email').isEmail(),
-    body('password', 'Password is required').exists(),
-  ],
-  authController.login
-);
+router.post('/login', validateUserLogin, authController.login);
 
 // @route   GET api/auth/logout
 // @desc    Logout user

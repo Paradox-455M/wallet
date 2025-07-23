@@ -2,6 +2,7 @@ const User = require('../models/User');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
+const EmailService = require('../services/emailService');
 
 // Generate JWT token
 const generateToken = (user) => {
@@ -31,6 +32,10 @@ exports.register = async (req, res) => {
 
     user = await User.create(email, password, fullName);
     const token = generateToken(user);
+    
+    // Send welcome email
+    await EmailService.sendWelcomeEmail(user.email, user.full_name);
+    
     res.status(201).json({ token, user: { id: user.id, email: user.email, fullName: user.full_name, createdAt: user.created_at } });
   } catch (err) {
     console.error('Registration error:', err);
