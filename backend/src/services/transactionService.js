@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { createPaymentIntent, transferToSeller, confirmPaymentIntent } = require('../config/stripe');
 const { getSignedUrl } = require('../config/s3');
+const EmailService = require('./emailService');
 
 class TransactionService {
   static async createTransaction(buyerEmail, sellerEmail, amount, itemDescription) {
@@ -13,7 +14,12 @@ class TransactionService {
     
     const values = [buyerEmail, sellerEmail, amount, itemDescription];
     const result = await db.query(query, values);
-    return result.rows[0].id;
+    const transactionId = result.rows[0].id;
+    
+    // Send notification emails
+    await EmailService.sendTransactionCreated(buyerEmail, sellerEmail, transactionId, amount, itemDescription);
+    
+    return transactionId;
   }
 
   static async initiatePayment(transactionId, amount) {
@@ -39,7 +45,17 @@ class TransactionService {
     `;
     
     const result = await db.query(query, [transactionId]);
-    return result.rows[0];
+    const transaction = result.rows[0];
+    
+    // Send notification email
+    await EmailService.sendPaymentReceived(
+      transaction.buyer_email, 
+      transaction.seller_email, 
+      transactionId, 
+      transaction.amount
+    );
+    
+    return transaction;
   }
 
   static async updateFileInfo(transactionId, fileKey, fileName) {
@@ -51,7 +67,17 @@ class TransactionService {
     `;
     
     const result = await db.query(query, [fileKey, fileName, transactionId]);
-    return result.rows[0];
+    const transaction = result.rows[0];
+    
+    // Send notification email
+    await EmailService.sendFileUploaded(
+      transaction.buyer_email, 
+      transaction.seller_email, 
+      transactionId, 
+      fileName
+    );
+    
+    return transaction;
   }
 
   static async getTransaction(transactionId) {
@@ -84,7 +110,17 @@ class TransactionService {
     `;
 
     const result = await db.query(query, [transfer.id, transactionId]);
-    return result.rows[0];
+    const completedTransaction = result.rows[0];
+    
+    // Send completion notification
+    await EmailService.sendTransactionCompleted(
+      completedTransaction.buyer_email,
+      completedTransaction.seller_email,
+      transactionId,
+      completedTransaction.amount
+    );
+    
+    return completedTransaction;
   }
 
   static async getDownloadUrl(transactionId) {

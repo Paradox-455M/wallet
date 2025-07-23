@@ -12,12 +12,13 @@ const User = require('./models/User'); // Assuming User model path
 dotenv.config();
 
 // Initialize database tables
+const { createTables } = require('./migrations/001_create_tables');
 (async () => {
   try {
-    await User.init();
-    console.log('Database tables initialized');
+    await createTables();
+    console.log('Database initialized successfully');
   } catch (err) {
-    console.error('Failed to initialize database tables:', err);
+    console.error('Failed to initialize database:', err);
     process.exit(1);
   }
 })();
@@ -45,10 +46,7 @@ app.use(session({
 app.use(passport.initialize());
 // app.use(passport.session()); // If using persistent login sessions with cookies
 
-// JWT Strategy for protecting routes
-
-
- 
+// JWT Strategy is configured in passport.js
 
 // Routes
 const transactionRoutes = require('./routes/transactionRoutes');
@@ -57,14 +55,14 @@ const authRoutes = require('./routes/authRoutes'); // Import auth routes
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/auth', authRoutes); // Use auth routes
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
+// Import error handling middleware
+const { globalErrorHandler, handleNotFound } = require('./middleware/errorHandler');
+
+// Handle unhandled routes
+app.use(handleNotFound);
+
+// Global error handling middleware
+app.use(globalErrorHandler);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
