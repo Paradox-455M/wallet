@@ -56,6 +56,18 @@ const Login = ({ onClose, modalMode }) => {
     }
   }, [authError]);
 
+  // Redirect to dashboard after successful authentication
+  useEffect(() => {
+    if (isAuthenticated && !loading) {
+      if (modalMode && onClose) {
+        onClose();
+        navigate('/dashboard');
+      } else if (!modalMode) {
+        navigate('/dashboard');
+      }
+    }
+  }, [isAuthenticated, loading, modalMode, onClose, navigate]);
+
   useEffect(() => {
     const handleOpenLoginModal = (e) => {
       setPageError(e.detail.error);
@@ -112,7 +124,7 @@ const Login = ({ onClose, modalMode }) => {
   }
 
   if (isAuthenticated && !modalMode) {
-    navigate('/');
+    navigate('/dashboard');
     return null;
   }
   if (isAuthenticated && modalMode && onClose) {

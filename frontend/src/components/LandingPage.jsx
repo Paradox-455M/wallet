@@ -30,6 +30,7 @@ import { Points, PointMaterial } from '@react-three/drei';
 import * as random from 'maath/random/dist/maath-random.esm';
 import Login from '../pages/Login';
 import { Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
 
 const LandingPage = () => {
   const bgColor = useColorModeValue('purple.500', 'purple.700');
@@ -54,6 +55,14 @@ const LandingPage = () => {
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth(); // Added
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to dashboard
+  React.useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, currentUser, navigate]);
   return (
     <Box position="relative" minH="100vh" overflowX="hidden">
       {/* Background Gradient and Stars */}
