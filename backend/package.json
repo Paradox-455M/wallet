@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "migrate": "node src/migrations/run_migrations.js",
+    "setup-db": "npm run migrate",
+    "verify-db": "node src/migrations/verify_setup.js",
     "test": "jest",
     "test-setup": "node test-setup.js"
   },

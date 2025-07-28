@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { createPaymentIntent, transferToSeller, confirmPaymentIntent } = require('../config/stripe');
 const { getSignedUrl } = require('../config/s3');
 const EmailService = require('./emailService');
+const Transaction = require('../models/Transaction');
 
 class TransactionService {
   static async createTransaction(buyerEmail, sellerEmail, amount, itemDescription) {
@@ -59,25 +60,7 @@ class TransactionService {
   }
 
   static async updateFileInfo(transactionId, fileKey, fileName) {
-    const query = `
-      UPDATE transactions
-      SET file_key = $1, file_name = $2, file_uploaded = true
-      WHERE id = $3
-      RETURNING *;
-    `;
-    
-    const result = await db.query(query, [fileKey, fileName, transactionId]);
-    const transaction = result.rows[0];
-    
-    // Send notification email
-    await EmailService.sendFileUploaded(
-      transaction.buyer_email, 
-      transaction.seller_email, 
-      transactionId, 
-      fileName
-    );
-    
-    return transaction;
+    return await Transaction.updateFileStatus(transactionId, fileKey, fileName);
   }
 
   static async getTransaction(transactionId) {
