@@ -96,7 +96,7 @@ const Login = ({ onClose, modalMode }) => {
         await login(form.email, form.password);
       }
       if (onClose) onClose(); // Close modal on success
-      else navigate('/'); // Redirect to home on page success
+      else navigate('/dashboard'); // Redirect to dashboard on page success
     } catch (err) {
       // Error is already set by AuthContext, or we can set pageError for local form errors
       // setPageError(err.response?.data?.message || err.message || 'Operation failed');
@@ -117,6 +117,7 @@ const Login = ({ onClose, modalMode }) => {
   }
   if (isAuthenticated && modalMode && onClose) {
     onClose();
+    navigate('/dashboard');
     return null;
   }
 

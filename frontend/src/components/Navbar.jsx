@@ -22,10 +22,10 @@ const Navbar = ({ onLoginOpen }) => {
 
   // Insert Dashboard link if authenticated
   if (isAuthenticated && currentUser) {
-    // filteredLinks = [
-    //   { label: "Dashboard", path: "/dashboard" },
-    //   ...filteredLinks
-    // ];
+    filteredLinks = [
+      { label: "Dashboard", path: "/dashboard" },
+      ...filteredLinks
+    ];
   }
 
   return (
@@ -53,18 +53,35 @@ const Navbar = ({ onLoginOpen }) => {
               </Button>
             ))}
             {isAuthenticated && currentUser ? (
-              <Button as={RouterLink} to="/dashboard" variant="ghost" color="white" _hover={{ bg: "whiteAlpha.200" }} p={0} minW={0} h="auto" bg="transparent">
-                <Avatar
-                  size="md"
-                  name={currentUser.fullName || currentUser.email}
-                  src={currentUser.photoURL}
-                  border="2px solid #fff"
-                  boxShadow="0 0 0 3px #9f7aea"
-                  cursor="pointer"
-                  _hover={{ boxShadow: "0 0 0 4px #d6bcfa", transform: "scale(1.08)", transition: "all 0.2s" }}
-                  bgGradient="linear(to-br, purple.400, purple.600)"
-                />
-              </Button>
+              <HStack spacing={3}>
+                <Button 
+                  as={RouterLink} 
+                  to="/dashboard" 
+                  variant="ghost" 
+                  color="white" 
+                  fontWeight="bold"
+                  fontSize="md"
+                  px={4}
+                  py={2}
+                  borderRadius="md"
+                  bg="whiteAlpha.100"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                >
+                  📊 Dashboard
+                </Button>
+                <Button as={RouterLink} to="/dashboard" variant="ghost" color="white" _hover={{ bg: "whiteAlpha.200" }} p={0} minW={0} h="auto" bg="transparent">
+                  <Avatar
+                    size="md"
+                    name={currentUser.fullName || currentUser.email}
+                    src={currentUser.photoURL}
+                    border="2px solid #fff"
+                    boxShadow="0 0 0 3px #9f7aea"
+                    cursor="pointer"
+                    _hover={{ boxShadow: "0 0 0 4px #d6bcfa", transform: "scale(1.08)", transition: "all 0.2s" }}
+                    bgGradient="linear(to-br, purple.400, purple.600)"
+                  />
+                </Button>
+              </HStack>
             ) : (
               <Button colorScheme="whiteAlpha" variant="ghost" color="white" onClick={onLoginOpen}>Login</Button>
             )}
