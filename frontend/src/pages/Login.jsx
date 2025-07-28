@@ -108,7 +108,7 @@ const Login = ({ onClose, modalMode }) => {
         await login(form.email, form.password);
       }
       if (onClose) onClose(); // Close modal on success
-      else navigate('/dashboard'); // Redirect to dashboard on page success
+      // Let the useEffect handle the redirect for non-modal login
     } catch (err) {
       // Error is already set by AuthContext, or we can set pageError for local form errors
       // setPageError(err.response?.data?.message || err.message || 'Operation failed');
@@ -123,13 +123,8 @@ const Login = ({ onClose, modalMode }) => {
     );
   }
 
-  if (isAuthenticated && !modalMode) {
-    navigate('/dashboard');
-    return null;
-  }
-  if (isAuthenticated && modalMode && onClose) {
-    onClose();
-    navigate('/dashboard');
+  // Don't render anything if authenticated - let useEffect handle the redirect
+  if (isAuthenticated) {
     return null;
   }
 

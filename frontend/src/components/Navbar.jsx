@@ -20,13 +20,7 @@ const Navbar = ({ onLoginOpen }) => {
   const currentPath = location.pathname;
   let filteredLinks = navLinks.filter(link => link.path !== currentPath);
 
-  // Insert Dashboard link if authenticated
-  if (isAuthenticated && currentUser) {
-    filteredLinks = [
-      { label: "Dashboard", path: "/dashboard" },
-      ...filteredLinks
-    ];
-  }
+  // Dashboard link is handled separately in the authenticated user section
 
   return (
     <Box bgGradient="linear(to-br, purple.400, purple.600)" px={4} position="fixed" w="full" zIndex={1000} boxShadow="sm">
@@ -39,7 +33,7 @@ const Navbar = ({ onLoginOpen }) => {
             </HStack>
           </Button>
           <Spacer />
-          <HStack spacing={4}>
+          <HStack spacing={3}>
             {filteredLinks.map(link => (
               <Button
                 key={link.path}
@@ -47,25 +41,29 @@ const Navbar = ({ onLoginOpen }) => {
                 to={link.path}
                 variant="link"
                 color="white"
+                fontSize="sm"
+                px={2}
                 _hover={{ textDecoration: "underline" }}
               >
                 {link.label}
               </Button>
             ))}
             {isAuthenticated && currentUser ? (
-              <HStack spacing={3}>
+              <HStack spacing={2}>
                 <Button 
                   as={RouterLink} 
                   to="/dashboard" 
                   variant="ghost" 
                   color="white" 
                   fontWeight="bold"
-                  fontSize="md"
-                  px={4}
+                  fontSize="sm"
+                  px={3}
                   py={2}
-                  borderRadius="md"
+                  borderRadius="lg"
                   bg="whiteAlpha.100"
                   _hover={{ bg: "whiteAlpha.200" }}
+                  minW="auto"
+                  whiteSpace="nowrap"
                 >
                   📊 Dashboard
                 </Button>
@@ -89,6 +87,9 @@ const Navbar = ({ onLoginOpen }) => {
               colorScheme="whiteAlpha"
               bg="white"
               color="purple.600"
+              fontSize="sm"
+              px={3}
+              py={2}
               _hover={{ bg: "gray.100" }}
               onClick={() => {
                 if (isAuthenticated && currentUser) {

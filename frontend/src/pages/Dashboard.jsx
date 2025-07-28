@@ -17,45 +17,96 @@ import StarryBackground from '../components/StarryBackground';
 import axios from 'axios';
 
 const statCardStyle = {
-  bg: 'rgba(255, 255, 255, 0.1)',
-  backdropFilter: 'blur(10px)',
+  bg: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+  backdropFilter: 'blur(20px)',
   color: 'white',
-  borderRadius: 'xl',
-  boxShadow: 'xl',
+  borderRadius: '2xl',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
   border: '1px solid',
-  borderColor: 'whiteAlpha.200',
-  p: 6,
-  minW: '150px',
+  borderColor: 'whiteAlpha.300',
+  p: 8,
+  minW: '200px',
   textAlign: 'center',
-  _hover: { transform: 'scale(1.02)' },
-  transition: 'all 0.2s'
+  _hover: { 
+    transform: 'translateY(-4px) scale(1.02)',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+    borderColor: 'purple.300'
+  },
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  position: 'relative',
+  overflow: 'hidden'
 };
 
 const transactionTableHeader = {
-  px: 4,
-  py: 2,
-  borderBottom: '1px solid',
-  borderColor: 'whiteAlpha.200',
-  color: 'purple.300',
+  px: 6,
+  py: 4,
+  borderBottom: '2px solid',
+  borderColor: 'whiteAlpha.300',
+  color: 'purple.200',
+  fontWeight: 'bold',
+  fontSize: 'sm',
+  textTransform: 'uppercase',
+  letterSpacing: 'wider'
 };
 
 const transactionTableRow = {
-  px: 4,
-  py: 3,
+  px: 6,
+  py: 4,
   borderBottom: '1px solid',
   borderColor: 'whiteAlpha.100',
   color: 'white',
   _hover: {
-    bg: 'whiteAlpha.50'
-  }
+    bg: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+    transform: 'translateX(4px)',
+    transition: 'all 0.2s ease'
+  },
+  transition: 'all 0.2s ease'
 };
 
 const statusBadge = (status) => {
-  if (status === 'COMPLETE') return <Badge colorScheme="green" fontSize="0.9em" px={3} py={1} borderRadius="md">COMPLETE</Badge>;
-  if (status === 'AWAITING FILE') return <Badge colorScheme="yellow" fontSize="0.9em" px={3} py={1} borderRadius="md">AWAITING FILE</Badge>;
-  if (status === 'AWAITING PAYMENT') return <Badge colorScheme="blue" fontSize="0.9em" px={3} py={1} borderRadius="md">AWAITING PAYMENT</Badge>;
-  if (status === 'CANCELLED') return <Badge colorScheme="red" fontSize="0.9em" px={3} py={1} borderRadius="md">CANCELLED</Badge>;
-  return <Badge colorScheme="gray" fontSize="0.9em" px={3} py={1} borderRadius="md">{status}</Badge>;
+  const badgeStyles = {
+    COMPLETE: {
+      bg: 'linear-gradient(135deg, #48BB78 0%, #38A169 100%)',
+      color: 'white',
+      boxShadow: '0 4px 12px rgba(72, 187, 120, 0.3)'
+    },
+    'AWAITING FILE': {
+      bg: 'linear-gradient(135deg, #ECC94B 0%, #D69E2E 100%)',
+      color: 'white',
+      boxShadow: '0 4px 12px rgba(236, 201, 75, 0.3)'
+    },
+    'AWAITING PAYMENT': {
+      bg: 'linear-gradient(135deg, #4299E1 0%, #3182CE 100%)',
+      color: 'white',
+      boxShadow: '0 4px 12px rgba(66, 153, 225, 0.3)'
+    },
+    CANCELLED: {
+      bg: 'linear-gradient(135deg, #F56565 0%, #E53E3E 100%)',
+      color: 'white',
+      boxShadow: '0 4px 12px rgba(245, 101, 101, 0.3)'
+    }
+  };
+
+  const style = badgeStyles[status] || {
+    bg: 'linear-gradient(135deg, #718096 0%, #4A5568 100%)',
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(113, 128, 150, 0.3)'
+  };
+
+  return (
+    <Badge
+      fontSize="0.8em"
+      px={4}
+      py={2}
+      borderRadius="full"
+      fontWeight="bold"
+      letterSpacing="wider"
+      textTransform="uppercase"
+      {...style}
+    >
+      {status}
+    </Badge>
+  );
 };
 
 const Dashboard = () => {
@@ -70,17 +121,19 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const fileInputRef = useRef(null);
   const toast = useToast();
-  const { user } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
 
   // Fetch buyer data
   const fetchBuyerData = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('Fetching buyer data with token:', token ? 'present' : 'missing');
       const response = await axios.get('/api/transactions/buyer-data', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      console.log('Buyer data response:', response.data);
       setBuyerData(response.data);
     } catch (error) {
       console.error('Error fetching buyer data:', error);
@@ -119,9 +172,15 @@ const Dashboard = () => {
   // Load data on component mount
   React.useEffect(() => {
     const loadData = async () => {
+      console.log('Loading dashboard data...');
       setLoading(true);
-      await Promise.all([fetchBuyerData(), fetchSellerData()]);
-      setLoading(false);
+      try {
+        await Promise.all([fetchBuyerData(), fetchSellerData()]);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -448,7 +507,7 @@ const Dashboard = () => {
     });
   };
 
-  if (!user) {
+  if (!currentUser || !isAuthenticated) {
     return <Login />;
   }
 
@@ -459,18 +518,104 @@ const Dashboard = () => {
       <Box position="relative" zIndex={1}>
         <Box maxW="1400px" mx="auto" px={6} py={8}>
           <VStack spacing={8} align="stretch">
-            {/* Header */}
-            <Box textAlign="center" mb={8}>
-              <Heading size="2xl" color="white" mb={2}>Dashboard</Heading>
-              <Text color="gray.300" fontSize="lg">Welcome back, {user.email}</Text>
+            {/* Enhanced Header */}
+            <Box textAlign="center" mb={8} position="relative">
+              <Box
+                position="absolute"
+                top="-20px"
+                left="50%"
+                transform="translateX(-50%)"
+                w="200px"
+                h="200px"
+                bg="linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%)"
+                borderRadius="full"
+                filter="blur(60px)"
+                zIndex={-1}
+              />
+              <Heading 
+                size="2xl" 
+                color="white" 
+                mb={3}
+                bgGradient="linear(to-r, purple.300, blue.300)"
+                bgClip="text"
+                fontWeight="bold"
+              >
+                Dashboard
+              </Heading>
+              <Text color="gray.300" fontSize="lg" fontWeight="medium">
+                Welcome back, <Text as="span" color="purple.300" fontWeight="bold">{currentUser.email}</Text>
+              </Text>
+              <Text color="gray.400" fontSize="sm" mt={2}>
+                Manage your transactions and track your progress
+              </Text>
             </Box>
 
-            {/* Tabs */}
+            {/* Enhanced Tabs */}
             <Tabs variant="soft-rounded" colorScheme="purple" onChange={setActiveTab}>
-              <TabList justifyContent="center" mb={8}>
-                <Tab color="white" _selected={{ bg: 'purple.500', color: 'white' }}>Buyer View</Tab>
-                <Tab color="white" _selected={{ bg: 'purple.500', color: 'white' }}>Seller View</Tab>
-                <Tab color="white" _selected={{ bg: 'purple.500', color: 'white' }}>Timeline</Tab>
+              <TabList 
+                justifyContent="center" 
+                mb={8}
+                bg="rgba(255, 255, 255, 0.05)"
+                borderRadius="xl"
+                p={2}
+                backdropFilter="blur(10px)"
+                border="1px solid"
+                borderColor="whiteAlpha.200"
+              >
+                <Tab 
+                  color="white" 
+                  _selected={{ 
+                    bg: 'linear-gradient(135deg, purple.500 0%, blue.500 100%)', 
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+                  }}
+                  _hover={{
+                    bg: 'whiteAlpha.100'
+                  }}
+                  fontWeight="medium"
+                  px={6}
+                  py={3}
+                  borderRadius="lg"
+                  transition="all 0.2s"
+                >
+                  Buyer View
+                </Tab>
+                <Tab 
+                  color="white" 
+                  _selected={{ 
+                    bg: 'linear-gradient(135deg, purple.500 0%, blue.500 100%)', 
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+                  }}
+                  _hover={{
+                    bg: 'whiteAlpha.100'
+                  }}
+                  fontWeight="medium"
+                  px={6}
+                  py={3}
+                  borderRadius="lg"
+                  transition="all 0.2s"
+                >
+                  Seller View
+                </Tab>
+                <Tab 
+                  color="white" 
+                  _selected={{ 
+                    bg: 'linear-gradient(135deg, purple.500 0%, blue.500 100%)', 
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+                  }}
+                  _hover={{
+                    bg: 'whiteAlpha.100'
+                  }}
+                  fontWeight="medium"
+                  px={6}
+                  py={3}
+                  borderRadius="lg"
+                  transition="all 0.2s"
+                >
+                  Timeline
+                </Tab>
               </TabList>
 
               <TabPanels>
@@ -488,9 +633,50 @@ const Dashboard = () => {
                       </Box>
                     ))}
                   </HStack>
-                  {/* Active Transactions Table */}
-                  <Box bg="rgba(255,255,255,0.1)" backdropFilter="blur(10px)" borderRadius="2xl" p={6} boxShadow="xl" border="1px solid" borderColor="whiteAlpha.200" _hover={{ transform: 'scale(1.01)' }} transition="all 0.2s">
-                    <Heading fontSize="lg" color="white" mb={4} fontWeight="bold">Active Transactions</Heading>
+                  {/* Enhanced Active Transactions Table */}
+                  <Box 
+                    bg="linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)" 
+                    backdropFilter="blur(20px)" 
+                    borderRadius="3xl" 
+                    p={8} 
+                    boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)" 
+                    border="1px solid" 
+                    borderColor="whiteAlpha.200" 
+                    _hover={{ 
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+                      borderColor: 'purple.300'
+                    }} 
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    position="relative"
+                    overflow="hidden"
+                  >
+                    <Box
+                      position="absolute"
+                      top="0"
+                      left="0"
+                      right="0"
+                      h="1px"
+                      bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
+                    />
+                    <Heading 
+                      fontSize="xl" 
+                      color="white" 
+                      mb={6} 
+                      fontWeight="bold"
+                      display="flex"
+                      alignItems="center"
+                      gap={3}
+                    >
+                      <Box
+                        w="8px"
+                        h="8px"
+                        bg="purple.400"
+                        borderRadius="full"
+                        boxShadow="0 0 12px rgba(147, 51, 234, 0.6)"
+                      />
+                      Active Transactions
+                    </Heading>
                     <Box overflowX="auto">
                       <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
                         <Box as="thead">
@@ -548,19 +734,47 @@ const Dashboard = () => {
                                 <HStack spacing={2} justify="center">
                                   {tx.actions.includes('Pay Now') && (
                                     <Button 
-                                      colorScheme="blue" 
+                                      bg="linear-gradient(135deg, #4299E1 0%, #3182CE 100%)"
+                                      color="white"
                                       size="sm"
                                       onClick={() => handlePayNow(tx.id)}
+                                      _hover={{
+                                        bg: 'linear-gradient(135deg, #3182CE 0%, #2C5282 100%)',
+                                        transform: 'translateY(-1px)',
+                                        boxShadow: '0 4px 12px rgba(66, 153, 225, 0.4)'
+                                      }}
+                                      _active={{
+                                        transform: 'translateY(0px)'
+                                      }}
+                                      fontWeight="bold"
+                                      borderRadius="lg"
+                                      px={4}
+                                      py={2}
+                                      transition="all 0.2s"
                                     >
                                       Pay Now
                                     </Button>
                                   )}
                                   {tx.actions.includes('Cancel') && (
                                     <Button 
-                                      colorScheme="gray" 
+                                      bg="linear-gradient(135deg, #718096 0%, #4A5568 100%)"
+                                      color="white"
                                       size="sm" 
                                       leftIcon={<CloseIcon boxSize={3} />}
                                       onClick={() => handleCancelTransaction(tx.id)}
+                                      _hover={{
+                                        bg: 'linear-gradient(135deg, #4A5568 0%, #2D3748 100%)',
+                                        transform: 'translateY(-1px)',
+                                        boxShadow: '0 4px 12px rgba(113, 128, 150, 0.4)'
+                                      }}
+                                      _active={{
+                                        transform: 'translateY(0px)'
+                                      }}
+                                      fontWeight="bold"
+                                      borderRadius="lg"
+                                      px={4}
+                                      py={2}
+                                      transition="all 0.2s"
                                     >
                                       Cancel
                                     </Button>
@@ -578,10 +792,24 @@ const Dashboard = () => {
                                   {tx.actions.includes('Copy Link') && (
                                     <Tooltip label="Copy Link">
                                       <Button 
-                                        colorScheme="gray" 
+                                        bg="linear-gradient(135deg, #9F7AEA 0%, #805AD5 100%)"
+                                        color="white"
                                         size="sm" 
                                         leftIcon={<CopyIcon />}
                                         onClick={() => handleCopyLink(tx.id)}
+                                        _hover={{
+                                          bg: 'linear-gradient(135deg, #805AD5 0%, #6B46C1 100%)',
+                                          transform: 'translateY(-1px)',
+                                          boxShadow: '0 4px 12px rgba(159, 122, 234, 0.4)'
+                                        }}
+                                        _active={{
+                                          transform: 'translateY(0px)'
+                                        }}
+                                        fontWeight="bold"
+                                        borderRadius="lg"
+                                        px={4}
+                                        py={2}
+                                        transition="all 0.2s"
                                       >
                                         Copy Link
                                       </Button>

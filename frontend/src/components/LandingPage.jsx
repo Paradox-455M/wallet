@@ -63,6 +63,11 @@ const LandingPage = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, currentUser, navigate]);
+
+  // Don't render anything if authenticated - let useEffect handle the redirect
+  if (isAuthenticated && currentUser) {
+    return null;
+  }
   return (
     <Box position="relative" minH="100vh" overflowX="hidden">
       {/* Background Gradient and Stars */}
