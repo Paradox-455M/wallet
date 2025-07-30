@@ -1,15 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Box, VStack, Heading, Text, Avatar, Modal, ModalOverlay, ModalContent, ModalBody, 
   useDisclosure, HStack, Flex, Badge, Icon, Button, Tabs, TabList, TabPanels, Tab, 
-  TabPanel, Divider, Tooltip, useToast, Progress, Input,
-  CircularProgress, CircularProgressLabel
+  TabPanel, Divider, Tooltip, useToast, Progress, Input, Select, InputGroup, InputLeftElement,
+  CircularProgress, CircularProgressLabel, SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText,
+  StatArrow, Alert, AlertIcon, Spinner, Menu, MenuButton, MenuList, MenuItem, IconButton
 } from '@chakra-ui/react';
 import { 
   CheckCircleIcon, TimeIcon, ArrowForwardIcon, ViewIcon, DownloadIcon, CopyIcon, 
-  CloseIcon, AttachmentIcon, ArrowUpIcon 
+  CloseIcon, AttachmentIcon, ArrowUpIcon, SearchIcon, ChevronDownIcon, BellIcon, RepeatIcon
 } from '@chakra-ui/icons';
-import { FiUpload, FiUploadCloud } from 'react-icons/fi';
+import { FiUpload, FiUploadCloud, FiTrendingUp, FiDollarSign, FiUsers, FiActivity } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 import Login from '../pages/Login';
 import Navbar from '../components/Navbar';
@@ -110,18 +111,109 @@ const statusBadge = (status) => {
 };
 
 const Dashboard = () => {
+  const { isAuthenticated, currentUser } = useAuth();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const fileInputRef = useRef(null);
+  const [buyerData, setBuyerData] = useState([]);
+  const [sellerData, setSellerData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const [buyerData, setBuyerData] = useState({ transactions: [], statistics: {} });
-  const [sellerData, setSellerData] = useState({ transactions: [], statistics: {} });
-  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [dateFilter, setDateFilter] = useState('ALL');
+  const [realTimeUpdates, setRealTimeUpdates] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
-  const fileInputRef = useRef(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [analyticsData, setAnalyticsData] = useState({
+    totalTransactions: 0,
+    totalEarnings: 0,
+    activeTransactions: 0,
+    monthlyGrowth: 0
+  });
   const toast = useToast();
-  const { currentUser, isAuthenticated } = useAuth();
+
+  // Real-time updates simulation
+  useEffect(() => {
+    if (realTimeUpdates) {
+      const interval = setInterval(() => {
+        // Simulate real-time updates
+        setBuyerData(prev => {
+          if (Array.isArray(prev)) {
+            return prev.map(item => ({
+              ...item,
+              lastUpdated: new Date().toISOString()
+            }));
+          }
+          // If prev is an object with transactions property, update the transactions
+          if (prev && prev.transactions && Array.isArray(prev.transactions)) {
+            return {
+              ...prev,
+              transactions: prev.transactions.map(item => ({
+                ...item,
+                lastUpdated: new Date().toISOString()
+              }))
+            };
+          }
+          return prev;
+        });
+        setSellerData(prev => {
+          if (Array.isArray(prev)) {
+            return prev.map(item => ({
+              ...item,
+              lastUpdated: new Date().toISOString()
+            }));
+          }
+          // If prev is an object with transactions property, update the transactions
+          if (prev && prev.transactions && Array.isArray(prev.transactions)) {
+            return {
+              ...prev,
+              transactions: prev.transactions.map(item => ({
+                ...item,
+                lastUpdated: new Date().toISOString()
+              }))
+            };
+          }
+          return prev;
+        });
+      }, 30000); // Update every 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [realTimeUpdates]);
+
+  // Enhanced analytics calculation
+  useEffect(() => {
+    // Handle both array and object formats for buyerData and sellerData
+    const getTransactionsFromData = (data) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && data.transactions && Array.isArray(data.transactions)) {
+        return data.transactions;
+      }
+      return [];
+    };
+    
+    const buyerTransactions = getTransactionsFromData(buyerData);
+    const sellerTransactions = getTransactionsFromData(sellerData);
+    
+    const allTransactions = [...buyerTransactions, ...sellerTransactions];
+    const totalAmount = allTransactions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const activeCount = allTransactions.filter(item => 
+      item.status === 'AWAITING FILE' || item.status === 'AWAITING PAYMENT'
+    ).length;
+
+    setAnalyticsData({
+      totalTransactions: allTransactions.length,
+      totalEarnings: totalAmount,
+      activeTransactions: activeCount,
+      monthlyGrowth: Math.floor(Math.random() * 20) + 5 // Simulated growth
+    });
+  }, [buyerData, sellerData]);
 
   // Fetch buyer data
   const fetchBuyerData = async () => {
@@ -187,7 +279,8 @@ const Dashboard = () => {
 
   // Helper functions for buyer view
   const getBuyerStats = () => {
-    const stats = buyerData.statistics || {};
+    // Handle both array and object formats
+    const stats = (buyerData && buyerData.statistics) ? buyerData.statistics : {};
     return [
       { title: 'Total Transactions', value: stats.totalTransactions || 0, icon: '📊' },
       { title: 'Pending Files', value: stats.pendingFiles || 0, icon: '⏳' },
@@ -197,7 +290,18 @@ const Dashboard = () => {
   };
 
   const getBuyerTransactions = () => {
-    return (buyerData.transactions || []).map(transaction => ({
+    // Helper function to get transactions from data
+    const getTransactionsFromData = (data) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && data.transactions && Array.isArray(data.transactions)) {
+        return data.transactions;
+      }
+      return [];
+    };
+
+    return getTransactionsFromData(buyerData).map(transaction => ({
       id: transaction.id,
       item: transaction.item_description,
       seller: transaction.seller_email,
@@ -218,7 +322,8 @@ const Dashboard = () => {
 
   // Helper functions for seller view
   const getSellerStats = () => {
-    const stats = sellerData.statistics || {};
+    // Handle both array and object formats
+    const stats = (sellerData && sellerData.statistics) ? sellerData.statistics : {};
     return [
       { title: '# of Uploads', value: stats.totalUploads || 0, icon: '🗂️' },
       { title: 'Total Earned', value: `$${(stats.totalEarned || 0).toFixed(2)}`, icon: '💰' },
@@ -228,7 +333,18 @@ const Dashboard = () => {
   };
 
   const getSellerTransactions = () => {
-    return (sellerData.transactions || []).map(transaction => ({
+    // Helper function to get transactions from data
+    const getTransactionsFromData = (data) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && data.transactions && Array.isArray(data.transactions)) {
+        return data.transactions;
+      }
+      return [];
+    };
+
+    return getTransactionsFromData(sellerData).map(transaction => ({
       id: transaction.id,
       item: transaction.item_description,
       buyer: transaction.buyer_email,
@@ -239,6 +355,50 @@ const Dashboard = () => {
       actions: getTransactionActions(transaction),
       timeLimit: '23h 15m' // This would be calculated based on created_at + expiry
     }));
+  };
+
+  // Helper function for Transaction History - combines buyer and seller transactions
+  const getAllTransactions = () => {
+    // Helper function to get transactions from data
+    const getTransactionsFromData = (data) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && data.transactions && Array.isArray(data.transactions)) {
+        return data.transactions;
+      }
+      return [];
+    };
+
+    const buyerTransactions = getTransactionsFromData(buyerData).map(transaction => ({
+      id: transaction.id,
+      item: transaction.item_description,
+      type: 'BUY',
+      counterparty: transaction.seller_email,
+      amount: parseFloat(transaction.amount),
+      status: getTransactionStatus(transaction),
+      date: new Date(transaction.created_at).toLocaleDateString(),
+      time: new Date(transaction.created_at).toLocaleTimeString(),
+      actions: getTransactionActions(transaction),
+      createdAt: new Date(transaction.created_at)
+    }));
+
+    const sellerTransactions = getTransactionsFromData(sellerData).map(transaction => ({
+      id: transaction.id,
+      item: transaction.item_description,
+      type: 'SELL',
+      counterparty: transaction.buyer_email,
+      amount: parseFloat(transaction.amount),
+      status: getTransactionStatus(transaction),
+      date: new Date(transaction.created_at).toLocaleDateString(),
+      time: new Date(transaction.created_at).toLocaleTimeString(),
+      actions: getTransactionActions(transaction),
+      createdAt: new Date(transaction.created_at)
+    }));
+
+    // Combine and sort by creation date (newest first)
+    const allTransactions = [...buyerTransactions, ...sellerTransactions];
+    return allTransactions.sort((a, b) => b.createdAt - a.createdAt);
   };
 
   // Helper functions for transaction processing
@@ -289,7 +449,7 @@ const Dashboard = () => {
       return;
     }
 
-    setIsUploading(true);
+    setUploading(true);
     setUploadProgress(0);
 
     const formData = new FormData();
@@ -335,7 +495,7 @@ const Dashboard = () => {
         isClosable: true,
       });
     } finally {
-      setIsUploading(false);
+      setUploading(false);
       setUploadProgress(0);
     }
   };
@@ -507,6 +667,232 @@ const Dashboard = () => {
     });
   };
 
+  // Enhanced filtering functions
+  const getFilteredTransactions = (data) => {
+    // Ensure data is an array
+    const dataArray = Array.isArray(data) ? data : [];
+    
+    return dataArray.filter(item => {
+      const matchesSearch = item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.buyer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.seller?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.item?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.counterparty?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
+      
+      const matchesDate = dateFilter === 'ALL' || 
+                         (dateFilter === 'TODAY' && isToday(new Date(item.createdAt || item.created_at))) ||
+                         (dateFilter === 'WEEK' && isThisWeek(new Date(item.createdAt || item.created_at))) ||
+                         (dateFilter === 'MONTH' && isThisMonth(new Date(item.createdAt || item.created_at)));
+
+      return matchesSearch && matchesStatus && matchesDate;
+    });
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isThisWeek = (date) => {
+    const today = new Date();
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return date >= weekAgo;
+  };
+
+  const isThisMonth = (date) => {
+    const today = new Date();
+    return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+  };
+
+  // Export functionality
+  const exportTransactions = (data, type) => {
+    const csvContent = data.map(item => 
+      `${item.id},${item.title},${item.amount},${item.status},${item.createdAt}`
+    ).join('\n');
+    
+    const blob = new Blob([`ID,Title,Amount,Status,Date\n${csvContent}`], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${type}_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast({
+      title: 'Export Successful',
+      description: `${type} transactions exported successfully`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true
+    });
+  };
+
+  // Enhanced analytics cards
+  const AnalyticsCard = ({ title, value, icon, change, color }) => (
+    <Box
+      bg="linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)"
+      backdropFilter="blur(20px)"
+      borderRadius="2xl"
+      boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+      border="1px solid"
+      borderColor="whiteAlpha.300"
+      p={6}
+      _hover={{
+        transform: 'translateY(-4px) scale(1.02)',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+        borderColor: color
+      }}
+      transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+      position="relative"
+      overflow="hidden"
+    >
+      <Box
+        position="absolute"
+        top="0"
+        left="0"
+        right="0"
+        h="1px"
+        bg={`linear-gradient(90deg, transparent 0%, ${color} 50%, transparent 100%)`}
+      />
+      <HStack spacing={4} align="center">
+        <Icon as={icon} w={8} h={8} color={color} />
+        <VStack align="start" spacing={1}>
+          <Text color="gray.400" fontSize="sm" fontWeight="medium">{title}</Text>
+          <Text color="white" fontSize="2xl" fontWeight="bold">{value}</Text>
+          {change && (
+            <HStack spacing={1}>
+              <Stat>
+                <StatArrow type={change > 0 ? 'increase' : 'decrease'} color={change > 0 ? 'green.400' : 'red.400'} />
+              </Stat>
+              <Text color={change > 0 ? 'green.400' : 'red.400'} fontSize="sm">{Math.abs(change)}%</Text>
+            </HStack>
+          )}
+        </VStack>
+      </HStack>
+    </Box>
+  );
+
+  // Enhanced filter controls
+  const FilterControls = () => (
+    <Box
+      bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+      backdropFilter="blur(20px)"
+      borderRadius="xl"
+      boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+      border="1px solid"
+      borderColor="whiteAlpha.200"
+      p={6}
+      mb={6}
+    >
+      <HStack spacing={4} justify="space-between" flexWrap="wrap">
+        <HStack spacing={4} flex={1}>
+          <InputGroup maxW="300px">
+            <InputLeftElement pointerEvents="none">
+              <Icon as={SearchIcon} color="purple.300" />
+            </InputLeftElement>
+            <Input
+              placeholder="Search transactions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              bg="rgba(255, 255, 255, 0.1)"
+              borderColor="whiteAlpha.200"
+              color="white"
+              _placeholder={{ color: 'purple.200' }}
+            />
+          </InputGroup>
+          
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            bg="rgba(255, 255, 255, 0.1)"
+            borderColor="whiteAlpha.200"
+            color="white"
+            maxW="200px"
+          >
+            <option value="ALL" style={{ backgroundColor: '#1a202c', color: 'white' }}>All Status</option>
+            <option value="COMPLETE" style={{ backgroundColor: '#1a202c', color: 'white' }}>Complete</option>
+            <option value="AWAITING FILE" style={{ backgroundColor: '#1a202c', color: 'white' }}>Awaiting File</option>
+            <option value="AWAITING PAYMENT" style={{ backgroundColor: '#1a202c', color: 'white' }}>Awaiting Payment</option>
+            <option value="CANCELLED" style={{ backgroundColor: '#1a202c', color: 'white' }}>Cancelled</option>
+          </Select>
+          
+          <Select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            bg="rgba(255, 255, 255, 0.1)"
+            borderColor="whiteAlpha.200"
+            color="white"
+            maxW="150px"
+          >
+            <option value="ALL" style={{ backgroundColor: '#1a202c', color: 'white' }}>All Time</option>
+            <option value="TODAY" style={{ backgroundColor: '#1a202c', color: 'white' }}>Today</option>
+            <option value="WEEK" style={{ backgroundColor: '#1a202c', color: 'white' }}>This Week</option>
+            <option value="MONTH" style={{ backgroundColor: '#1a202c', color: 'white' }}>This Month</option>
+          </Select>
+        </HStack>
+        
+        <HStack spacing={2}>
+          <Button
+            leftIcon={<RepeatIcon />}
+            onClick={() => window.location.reload()}
+            bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+            color="white"
+            _hover={{
+              bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+            }}
+            size="sm"
+          >
+            Refresh
+          </Button>
+          
+          <Menu>
+            <MenuButton
+              as={Button}
+              rightIcon={<ChevronDownIcon />}
+              bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+              color="white"
+              _hover={{
+                bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+              }}
+              size="sm"
+            >
+              Export
+            </MenuButton>
+                      <MenuList bg="gray.800" borderColor="whiteAlpha.200">
+            <MenuItem 
+              onClick={() => exportTransactions(getFilteredTransactions(buyerData), 'Buyer')}
+              _hover={{ bg: 'whiteAlpha.100' }}
+              color="white"
+            >
+              Export Buyer Data
+            </MenuItem>
+            <MenuItem 
+              onClick={() => exportTransactions(getFilteredTransactions(sellerData), 'Seller')}
+              _hover={{ bg: 'whiteAlpha.100' }}
+              color="white"
+            >
+              Export Seller Data
+            </MenuItem>
+            <MenuItem 
+              onClick={() => exportTransactions(getFilteredTransactions(getAllTransactions()), 'Complete History')}
+              _hover={{ bg: 'whiteAlpha.100' }}
+              color="white"
+            >
+              Export Complete History
+            </MenuItem>
+          </MenuList>
+          </Menu>
+        </HStack>
+      </HStack>
+    </Box>
+  );
+
   if (!currentUser || !isAuthenticated) {
     return <Login />;
   }
@@ -514,45 +900,90 @@ const Dashboard = () => {
   return (
     <Box minH="100vh" bg="gray.900" position="relative">
       <StarryBackground />
-      <Navbar />
+      <Navbar onLoginOpen={onOpen} />
       <Box position="relative" zIndex={1}>
         <Box maxW="1400px" mx="auto" px={6} py={8}>
           <VStack spacing={8} align="stretch">
-            {/* Enhanced Header */}
-            <Box textAlign="center" mb={8} position="relative">
-              <Box
-                position="absolute"
-                top="-20px"
-                left="50%"
-                transform="translateX(-50%)"
-                w="200px"
-                h="200px"
-                bg="linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%)"
-                borderRadius="full"
-                filter="blur(60px)"
-                zIndex={-1}
-              />
-              <Heading 
+            {/* Enhanced Header with Real-time Indicator */}
+            <Box>
+              <HStack justify="space-between" align="center" mb={4}>
+                <VStack align="start" spacing={2}>
+                <Heading 
                 size="2xl" 
                 color="white" 
-                style={{marginTop: '5%'}}
                 mb={3}
                 bgGradient="linear(to-r, purple.300, blue.300)"
                 bgClip="text"
                 fontWeight="bold"
+                style={{marginTop: '5%'}}
               >
                 Dashboard
               </Heading>
-              <Text color="gray.300" fontSize="lg" fontWeight="medium">
-                Welcome back, <Text as="span" color="purple.300" fontWeight="bold">{currentUser.email}</Text>
-              </Text>
-              <Text color="gray.400" fontSize="sm" mt={2}>
-                Manage your transactions and track your progress
-              </Text>
+                  <Heading size="xl" color="white" fontWeight="bold" >
+                    Welcome back, {currentUser?.email}
+                  </Heading>
+                  <HStack spacing={2}>
+                    <Box
+                      w={3}
+                      h={3}
+                      borderRadius="full"
+                      bg={realTimeUpdates ? 'green.400' : 'gray.400'}
+                      boxShadow={realTimeUpdates ? '0 0 10px rgba(72, 187, 120, 0.5)' : 'none'}
+                    />
+                    <Text color="gray.400" fontSize="sm">
+                      {realTimeUpdates ? 'Live Updates Active' : 'Updates Paused'}
+                    </Text>
+                  </HStack>
+                </VStack>
+                <Button
+                  leftIcon={<BellIcon />}
+                  onClick={() => setRealTimeUpdates(!realTimeUpdates)}
+                  bg={realTimeUpdates ? 'green.500' : 'gray.600'}
+                  color="white"
+                  _hover={{
+                    bg: realTimeUpdates ? 'green.600' : 'gray.500'
+                  }}
+                  size="sm"
+                >
+                  {realTimeUpdates ? 'Live' : 'Paused'}
+                </Button>
+              </HStack>
             </Box>
 
-            {/* Enhanced Tabs */}
-            <Tabs variant="soft-rounded" colorScheme="purple" onChange={setActiveTab}>
+            {/* Analytics Cards */}
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
+              <AnalyticsCard
+                title="Total Transactions"
+                value={analyticsData.totalTransactions}
+                icon={FiActivity}
+                change={analyticsData.monthlyGrowth}
+                color="purple.300"
+              />
+              <AnalyticsCard
+                title="Total Earnings"
+                value={`$${analyticsData.totalEarnings.toLocaleString()}`}
+                icon={FiDollarSign}
+                change={12}
+                color="green.300"
+              />
+              <AnalyticsCard
+                title="Active Transactions"
+                value={analyticsData.activeTransactions}
+                icon={FiTrendingUp}
+                change={8}
+                color="blue.300"
+              />
+              <AnalyticsCard
+                title="Monthly Growth"
+                value={`${analyticsData.monthlyGrowth}%`}
+                icon={FiUsers}
+                change={analyticsData.monthlyGrowth}
+                color="orange.300"
+              />
+            </SimpleGrid>
+
+            {/* Enhanced Tabs with Filter Controls */}
+            <Tabs variant="soft-rounded" colorScheme="purple" isFitted onChange={setActiveTab}>
               <TabList 
                 justifyContent="center" 
                 mb={8}
@@ -579,7 +1010,7 @@ const Dashboard = () => {
                   borderRadius="lg"
                   transition="all 0.2s"
                 >
-                  Buyer View
+                  Buyer Transactions
                 </Tab>
                 <Tab 
                   color="white" 
@@ -597,7 +1028,7 @@ const Dashboard = () => {
                   borderRadius="lg"
                   transition="all 0.2s"
                 >
-                  Seller View
+                  Seller Transactions
                 </Tab>
                 <Tab 
                   color="white" 
@@ -615,41 +1046,21 @@ const Dashboard = () => {
                   borderRadius="lg"
                   transition="all 0.2s"
                 >
-                  Timeline
+                  Transaction History
                 </Tab>
               </TabList>
 
               <TabPanels>
-                {/* Buyer Tab */}
                 <TabPanel px={0}>
-                  {/* Buyer Summary */}
-                  <HStack spacing={6} mb={8}>
-                    {getBuyerStats().map((stat) => (
-                      <Box key={stat.title} {...statCardStyle} minW="282px">
-                        <Text fontSize="sm" color="purple.200" fontWeight="medium">{stat.title}</Text>
-                        <HStack justify="center" mt={2}>
-                          <Text fontSize="3xl">{stat.icon}</Text>
-                          <Heading fontSize="2xl" color="white">{stat.value}</Heading>
-                        </HStack>
-                      </Box>
-                    ))}
-                  </HStack>
-                  {/* Enhanced Active Transactions Table */}
-                  <Box 
-                    bg="linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)" 
-                    backdropFilter="blur(20px)" 
-                    borderRadius="3xl" 
-                    p={8} 
-                    boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)" 
-                    border="1px solid" 
-                    borderColor="whiteAlpha.200" 
-                    _hover={{ 
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                      borderColor: 'purple.300'
-                    }} 
-                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                    position="relative"
+                  <FilterControls />
+                  {/* Enhanced Buyer Transactions Table */}
+                  <Box
+                    bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+                    backdropFilter="blur(20px)"
+                    borderRadius="3xl"
+                    boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+                    border="1px solid"
+                    borderColor="whiteAlpha.200"
                     overflow="hidden"
                   >
                     <Box
@@ -835,23 +1246,44 @@ const Dashboard = () => {
                   </Box>
                 </TabPanel>
 
-                {/* Seller Tab */}
                 <TabPanel px={0}>
-                  {/* Seller Summary */}
-                  <HStack spacing={6} mb={8}>
-                    {getSellerStats().map((stat) => (
-                      <Box key={stat.title} {...statCardStyle} minW="282px">
-                        <Text fontSize="sm" color="purple.200" fontWeight="medium">{stat.title}</Text>
-                        <HStack justify="center" mt={2}>
-                          <Text fontSize="3xl">{stat.icon}</Text>
-                          <Heading fontSize="2xl" color="white">{stat.value}</Heading>
-                        </HStack>
-                      </Box>
-                    ))}
-                  </HStack>
-                  {/* Upload Tasks Table */}
-                  <Box bg="rgba(255,255,255,0.1)" backdropFilter="blur(10px)" borderRadius="2xl" p={6} boxShadow="xl" border="1px solid" borderColor="whiteAlpha.200" _hover={{ transform: 'scale(1.01)' }} transition="all 0.2s">
-                    <Heading fontSize="lg" color="white" mb={4} fontWeight="bold">Upload Tasks</Heading>
+                  <FilterControls />
+                  {/* Enhanced Seller Transactions Table */}
+                  <Box
+                    bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+                    backdropFilter="blur(20px)"
+                    borderRadius="3xl"
+                    boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+                    border="1px solid"
+                    borderColor="whiteAlpha.200"
+                    overflow="hidden"
+                  >
+                    <Box
+                      position="absolute"
+                      top="0"
+                      left="0"
+                      right="0"
+                      h="1px"
+                      bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
+                    />
+                    <Heading 
+                      fontSize="xl" 
+                      color="white" 
+                      mb={6} 
+                      fontWeight="bold"
+                      display="flex"
+                      alignItems="center"
+                      gap={3}
+                    >
+                      <Box
+                        w="8px"
+                        h="8px"
+                        bg="purple.400"
+                        borderRadius="full"
+                        boxShadow="0 0 12px rgba(147, 51, 234, 0.6)"
+                      />
+                      Upload Tasks
+                    </Heading>
                     <Box overflowX="auto">
                       <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
                         <Box as="thead">
@@ -938,25 +1370,162 @@ const Dashboard = () => {
                   </Box>
                 </TabPanel>
 
-                {/* Timeline Tab */}
                 <TabPanel px={0}>
-                  {/* Transaction Timeline View */}
-                  <Box bg="rgba(255,255,255,0.1)" backdropFilter="blur(10px)" borderRadius="2xl" p={6} boxShadow="xl" border="1px solid" borderColor="whiteAlpha.200" _hover={{ transform: 'scale(1.01)' }} transition="all 0.2s">
-                    <Heading fontSize="lg" color="white" mb={4} fontWeight="bold">Transaction Timeline View</Heading>
-                    <Box maxW="700px" mx="auto" mt={8}>
-                      <Box bg="whiteAlpha.50" borderRadius="xl" p={6} boxShadow="lg" border="1px solid" borderColor="whiteAlpha.200">
-                        <Text fontWeight="bold" fontSize="lg" color="white" mb={2}>
-                          Transaction: #TID123456 (Design Package.zip)
-                        </Text>
-                        <Text fontSize="sm" color="gray.300" mb={6}>
-                          Buyer: buyer@email.com | Seller: john@example.com
-                        </Text>
-                        <VStack align="stretch" spacing={0} position="relative">
-                          {/* Timeline content would go here */}
-                          <Text color="gray.400" textAlign="center" py={8}>
-                            Timeline view coming soon...
-                          </Text>
-                        </VStack>
+                  <FilterControls />
+                  {/* Enhanced Transaction History Table */}
+                  <Box
+                    bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+                    backdropFilter="blur(20px)"
+                    borderRadius="3xl"
+                    boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+                    border="1px solid"
+                    borderColor="whiteAlpha.200"
+                    overflow="hidden"
+                  >
+                    <Box
+                      position="absolute"
+                      top="0"
+                      left="0"
+                      right="0"
+                      h="1px"
+                      bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
+                    />
+                    <Heading 
+                      fontSize="xl" 
+                      color="white" 
+                      mb={6} 
+                      fontWeight="bold"
+                      display="flex"
+                      alignItems="center"
+                      gap={3}
+                    >
+                      <Box
+                        w="8px"
+                        h="8px"
+                        bg="purple.400"
+                        borderRadius="full"
+                        boxShadow="0 0 12px rgba(147, 51, 234, 0.6)"
+                      />
+                      Complete Transaction History
+                    </Heading>
+                    <Box overflowX="auto">
+                      <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
+                        <Box as="thead">
+                          <Box as="tr">
+                            <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Transaction ID</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Item</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Type</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Counterparty</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="right" color="whiteAlpha.700">Amount</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="center" color="whiteAlpha.700">Status</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="center" color="whiteAlpha.700">Date</Box>
+                            <Box as="th" {...transactionTableHeader} textAlign="center" color="whiteAlpha.700">Actions</Box>
+                          </Box>
+                        </Box>
+                        <Box as="tbody">
+                          {loading ? (
+                            <Box as="tr">
+                              <Box as="td" colSpan={8} textAlign="center" py={8}>
+                                <Text color="gray.400">Loading transaction history...</Text>
+                              </Box>
+                            </Box>
+                          ) : getAllTransactions().length === 0 ? (
+                            <Box as="tr">
+                              <Box as="td" colSpan={8} textAlign="center" py={8}>
+                                <VStack spacing={4}>
+                                  <Text color="gray.400">No transaction history found</Text>
+                                  <Text color="gray.500" fontSize="sm">Your transaction history will appear here</Text>
+                                </VStack>
+                              </Box>
+                            </Box>
+                          ) : getAllTransactions().map((tx, idx) => (
+                            <Box as="tr" key={tx.id || idx} {...transactionTableRow}>
+                              <Box as="td" textAlign="left">
+                                <Text fontSize="sm" color="purple.300" fontWeight="bold">#{tx.id}</Text>
+                              </Box>
+                              <Box as="td" textAlign="left" fontWeight="bold">{tx.item}</Box>
+                              <Box as="td" textAlign="left">
+                                <Badge
+                                  bg={tx.type === 'BUY' ? 'blue.500' : 'green.500'}
+                                  color="white"
+                                  fontSize="xs"
+                                  px={2}
+                                  py={1}
+                                  borderRadius="full"
+                                >
+                                  {tx.type}
+                                </Badge>
+                              </Box>
+                              <Box as="td" textAlign="left">
+                                <HStack>
+                                  <Avatar size="xs" name={tx.counterparty} bg="whiteAlpha.600" color="purple.700" />
+                                  <Text color="whiteAlpha.800">{tx.counterparty}</Text>
+                                </HStack>
+                              </Box>
+                              <Box as="td" textAlign="right">
+                                <Text color={tx.type === 'BUY' ? 'red.300' : 'green.300'} fontWeight="bold">
+                                  {tx.type === 'BUY' ? '-' : '+'}${tx.amount.toFixed(2)}
+                                </Text>
+                              </Box>
+                              <Box as="td" textAlign="center">{statusBadge(tx.status)}</Box>
+                              <Box as="td" textAlign="center">
+                                <VStack spacing={1} align="center">
+                                  <Text fontSize="xs" color="gray.300">{tx.date}</Text>
+                                  <Text fontSize="xs" color="gray.400">{tx.time}</Text>
+                                </VStack>
+                              </Box>
+                              <Box as="td" textAlign="center">
+                                <HStack spacing={2} justify="center">
+                                  {tx.actions.includes('Download File') && (
+                                    <Button 
+                                      colorScheme="purple" 
+                                      size="sm" 
+                                      leftIcon={<DownloadIcon />}
+                                      onClick={() => handleDownloadFile(tx.id)}
+                                    >
+                                      Download
+                                    </Button>
+                                  )}
+                                  {tx.actions.includes('Copy Link') && (
+                                    <Tooltip label="Copy Link">
+                                      <Button 
+                                        bg="linear-gradient(135deg, #9F7AEA 0%, #805AD5 100%)"
+                                        color="white"
+                                        size="sm" 
+                                        leftIcon={<CopyIcon />}
+                                        onClick={() => handleCopyLink(tx.id)}
+                                        _hover={{
+                                          bg: 'linear-gradient(135deg, #805AD5 0%, #6B46C1 100%)',
+                                          transform: 'translateY(-1px)',
+                                          boxShadow: '0 4px 12px rgba(159, 122, 234, 0.4)'
+                                        }}
+                                        _active={{
+                                          transform: 'translateY(0px)'
+                                        }}
+                                        fontWeight="bold"
+                                        borderRadius="lg"
+                                        px={4}
+                                        py={2}
+                                        transition="all 0.2s"
+                                      >
+                                        Copy Link
+                                      </Button>
+                                    </Tooltip>
+                                  )}
+                                  {tx.actions.includes('View Details') && (
+                                    <Button 
+                                      colorScheme="gray" 
+                                      size="sm" 
+                                      leftIcon={<ViewIcon />}
+                                    >
+                                      Details
+                                    </Button>
+                                  )}
+                                </HStack>
+                              </Box>
+                            </Box>
+                          ))}
+                        </Box>
                       </Box>
                     </Box>
                   </Box>
@@ -1003,7 +1572,7 @@ const Dashboard = () => {
                 </VStack>
               </Box>
 
-              {isUploading && (
+              {uploading && (
                 <VStack spacing={4} w="full">
                   <CircularProgress value={uploadProgress} color="purple.400" size="60px">
                     <CircularProgressLabel>{uploadProgress}%</CircularProgressLabel>
