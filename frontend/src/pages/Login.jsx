@@ -128,30 +128,14 @@ const Login = ({ onClose, modalMode }) => {
     return null;
   }
 
+  // Only render in modal mode
+  if (!modalMode) {
+    return null;
+  }
+
   return (
-    <Box position={modalMode ? "relative" : "static"} minH={modalMode ? undefined : "100vh"} overflow={modalMode ? undefined : "hidden"}>
-      {!modalMode && (
-        <Navbar onLoginOpen={() => {}} />
-      )}
-      {!modalMode && (
-        <Box p={8} pt={24}>
-          <Box 
-            position="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            zIndex={-1}
-            bgGradient="linear(to-br, purple.400, purple.600)"
-          >
-            <Canvas camera={{ position: [0, 0, 1] }}>
-              <Stars />
-            </Canvas>
-          </Box>
-        </Box>
-      )}
-      <Box maxW={modalMode ? "100%" : "md"} mx="auto" mt={modalMode ? 0 : {base: 20, md: 32}} p={modalMode ? 0 : 8} borderWidth={modalMode ? 0 : 1} borderRadius={modalMode ? "2xl" : "lg"} bg={bgColor} color={headingColor} boxShadow={modalMode ? "none" : "2xl"}>
-        <VStack spacing={6} align="stretch" p={modalMode ? 2 : 0}>
+    <Box>
+      <VStack spacing={6} align="stretch" p={2}>
           <Heading fontSize="2xl" mb={modalMode ? 2 : 4} textAlign="center" fontWeight="bold">
             {isRegisterMode ? 'Create Account' : 'Login'}
           </Heading>
@@ -289,7 +273,6 @@ const Login = ({ onClose, modalMode }) => {
           </form>
         </VStack>
       </Box>
-    </Box>
   );
 };
 

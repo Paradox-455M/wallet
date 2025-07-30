@@ -1,9 +1,9 @@
 import React from 'react';
-import { Box, Container, Flex, Spacer, HStack, Button, VStack, Text, Icon, Heading, useColorModeValue, SimpleGrid, Image, Alert, AlertIcon, Grid, GridItem, Avatar, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react'; // Added Avatar and Modal related imports
+import { Box, Container, Flex, Spacer, HStack, Button, VStack, Text, Icon, Heading, useColorModeValue, SimpleGrid, Image, Alert, AlertIcon, Grid, GridItem, Avatar, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
 import { Link, useLocation } from 'react-router-dom';
 import { LockIcon, CloseIcon, WarningIcon } from '@chakra-ui/icons';
-import { useAuth } from '../contexts/AuthContext'; // Added
-import Login from '../pages/Login'; // Added
+import { useAuth } from '../contexts/AuthContext';
+import Login from '../pages/Login';
 import Navbar from '../components/Navbar';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@chakra-ui/react';
 import * as random from 'maath/random/dist/maath-random.esm';
@@ -204,238 +204,157 @@ const logos = [
 const Features = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
+  
   return (
-    <Box minH="100vh" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative">
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
-      <Box pt={24} pb={12} px={4}>
-        <Container maxW="container.xl">
-          <Heading fontSize="4xl" fontWeight="bold" color="white" textAlign="center" mb={4}>
-            Why Choose SecureEscrow?
-          </Heading>
-          <Text color="whiteAlpha.800" textAlign="center" mb={8}>
-            Built for security, designed for simplicity
-          </Text>
-          <Box textAlign="center" mb={10}>
-            <Button colorScheme="whiteAlpha" bg="white" color="purple.600" _hover={{ bg: 'gray.100' }} size="lg" rightIcon={<ArrowRightIcon className="chakra-icon" />}>Start a Free Transaction</Button>
-          </Box>
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8} mb={8}>
-            {features.slice(0, 3).map((feature, idx) => (
-              <Box key={feature.title} bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)" p={6} rounded="xl" boxShadow="2xl" textAlign="center" _hover={{ transform: 'scale(1.05)' }} transition="all 0.5s">
-                <Icon as={feature.icon} w={10} h={10} color="purple.300" mb={4} />
-                <Text fontWeight="bold" fontSize="xl" color="white" mb={2}>{feature.title}</Text>
-                <Text color="gray.200">{feature.description}</Text>
-              </Box>
-            ))}
-          </SimpleGrid>
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={10} mt={10}>
-            {features.map((feature, index) => (
+      <Box position="relative" zIndex={1}>
+        <Box maxW="1400px" mx="auto" px={6} py={8}>
+          <VStack spacing={12} align="stretch">
+            {/* Enhanced Header */}
+            <Box textAlign="center" mb={8} position="relative">
               <Box
-                key={index}
-                p={6}
-                rounded="xl"
-                boxShadow="2xl"
-                bg="whiteAlpha.100"
-                backdropFilter="blur(20px)"
-                border="1px solid"
-                borderColor="whiteAlpha.200"
-                textAlign="center"
-                _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s"
+                position="absolute"
+                top="-20px"
+                left="50%"
+                transform="translateX(-50%)"
+                w="300px"
+                h="300px"
+                bg="linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%)"
+                borderRadius="full"
+                filter="blur(60px)"
+                zIndex={-1}
+              />
+              <Heading 
+                size="2xl" 
+                color="white" 
+                mb={3}
+                bgGradient="linear(to-r, purple.300, blue.300)"
+                bgClip="text"
+                fontWeight="bold"
+                style={{marginTop: '5%'}}
               >
-                <Icon as={feature.icon} w={10} h={10} color="purple.300" mb={4} />
-                <Text fontWeight="bold" fontSize="xl" color="white" mb={2}>{feature.title}</Text>
-                <Text color="gray.200">{feature.description}</Text>
-              </Box>
-            ))}
-          </SimpleGrid>
-         
-        </Container>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
-          <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
-          <ModalContent
-            bg="rgba(30, 32, 48, 0.95)"
-            borderRadius="2xl"
-            boxShadow="2xl"
-            p={{ base: 0, md: 2 }}
-            maxW="420px"
-            mx="auto"
-            color="white"
-            position="relative"
-          >
-            <Box position="absolute" top={4} right={4} zIndex={2}>
-              <Button onClick={onClose} variant="ghost" colorScheme="whiteAlpha" size="sm" borderRadius="full" _hover={{ bg: 'whiteAlpha.300' }}>
-                &#10005;
+                Why Choose SecureEscrow?
+              </Heading>
+              <Text color="gray.300" fontSize="lg" fontWeight="medium" mb={6} >
+                Built for security, designed for simplicity
+              </Text>
+              <Button 
+                bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+                color="white"
+                size="lg" 
+                rightIcon={<ArrowRightIcon className="chakra-icon" />}
+                _hover={{
+                  bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+                }}
+                _active={{
+                  transform: 'translateY(0px)'
+                }}
+                fontWeight="bold"
+                borderRadius="xl"
+                px={8}
+                py={6}
+                transition="all 0.3s"
+              >
+                Start a Free Transaction
               </Button>
             </Box>
-            <ModalBody p={{ base: 4, md: 8 }}>
-              <Login onClose={onClose} modalMode />
-            </ModalBody>
-          </ModalContent>
-        </Modal>
-      </Box>
-      {/* How People Use SecureEscrow Section */}
-      <Container maxW="container.xl" mt={16}>
-          <Heading fontSize="3xl" color="white" textAlign="center" mb={10}>How People Use SecureEscrow</Heading>
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8}>
-            <Box bg="rgba(255,255,255,0.10)" borderRadius="2xl" boxShadow="2xl" p={8} textAlign="center" _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Icon as={UserIcon} w={12} h={12} color="purple.200" mb={4} />
-              <Text fontWeight="bold" fontSize="xl" color="white" mb={2}>Freelancers</Text>
-              <Text color="gray.200">Getting paid safely for web development, design, writing, and other project-based work. No more chasing invoices!</Text>
+
+            {/* Features Grid with Backdrop Hover */}
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8}>
+              {features.map((feature, index) => (
+                <Box
+                  key={index}
+                  bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+                  backdropFilter="blur(20px)"
+                  p={8}
+                  borderRadius="3xl"
+                  boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+                  border="1px solid"
+                  borderColor="whiteAlpha.200"
+                  textAlign="center"
+                  _hover={{
+                    transform: 'translateY(-4px) scale(1.02)',
+                    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+                    borderColor: 'purple.300',
+                    bg: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%)',
+                    backdropFilter: 'blur(25px)'
+                  }}
+                  transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                  position="relative"
+                  overflow="hidden"
+                >
+                  <Box
+                    position="absolute"
+                    top="0"
+                    left="0"
+                    right="0"
+                    h="1px"
+                    bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
+                  />
+                  <Icon as={feature.icon} w={12} h={12} color="purple.300" mb={6} />
+                  <Text fontWeight="bold" fontSize="xl" color="white" mb={4}>{feature.title}</Text>
+                  <Text color="gray.300" fontSize="md" lineHeight="1.6">{feature.description}</Text>
+                </Box>
+              ))}
+            </SimpleGrid>
+
+            {/* Call to Action */}
+            <Box textAlign="center" mt={16}>
+              <Text fontWeight="semibold" color="white" fontSize="xl" mb={6}>
+                Ready to transact with confidence?
+              </Text>
+              <Button 
+                bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+                color="white"
+                size="lg"
+                _hover={{
+                  bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+                }}
+                _active={{
+                  transform: 'translateY(0px)'
+                }}
+                fontWeight="bold"
+                borderRadius="xl"
+                px={8}
+                py={6}
+                transition="all 0.3s"
+              >
+                Create Your First Escrow
+              </Button>
             </Box>
-            <Box bg="rgba(255,255,255,0.10)" borderRadius="2xl" boxShadow="2xl" p={8} textAlign="center" _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Icon as={UserGraduateIcon} w={12} h={12} color="purple.200" mb={4} />
-              <Text fontWeight="bold" fontSize="xl" color="white" mb={2}>Digital Artists</Text>
-              <Text color="gray.200">Selling artwork, NFT commissions, or custom digital creations securely, ensuring payment upon delivery.</Text>
-            </Box>
-            <Box bg="rgba(255,255,255,0.10)" borderRadius="2xl" boxShadow="2xl" p={8} textAlign="center" _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Icon as={UserTieIcon} w={12} h={12} color="purple.200" mb={4} />
-              <Text fontWeight="bold" fontSize="xl" color="white" mb={2}>Agencies</Text>
-              <Text color="gray.200">Using escrow for milestone-based contracts with clients, ensuring smooth project flow and timely payments.</Text>
-            </Box>
-          </SimpleGrid>
-        </Container>
-      <Box pt={24} pb={12} px={4}>
-        <Container maxW="container.xl">
-<Box bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)" p={8} borderRadius="xl" boxShadow="xl" color="white" _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-          <Heading as="h2" size="xl" textAlign="center" mb={8} fontWeight="bold" >
-            Why Not Just Use PayPal or Venmo?
-          </Heading>
-          <Table variant="unstyled">
-            <Tbody>
-              <Tr>
-                <Th color="white" fontSize="lg">Feature</Th>
-                <Th color="white" fontSize="lg" textAlign="center">SecureEscrow</Th>
-                <Th color="white" fontSize="lg" textAlign="center">PayPal/Venmo (Standard)</Th>
-              </Tr>
-              <Tr>
-                <Td>Holds payment in escrow</Td>
-                <Td textAlign="center"><Icon as={CheckCircleIcon} w={5} h={5} color="green.400" /> Yes</Td>
-                <Td textAlign="center"><Icon as={CloseIcon} w={5} h={5} color="red.400" /> No (Limited)</Td>
-              </Tr>
-              <Tr>
-                <Td>Milestone-based payments</Td>
-                <Td textAlign="center"><Icon as={CheckCircleIcon} w={5} h={5} color="green.400" /> Yes</Td>
-                <Td textAlign="center"><Icon as={CloseIcon} w={5} h={5} color="red.400" /> No</Td>
-              </Tr>
-              <Tr>
-                <Td>Fraud protection for both parties</Td>
-                <Td textAlign="center"><Icon as={CheckCircleIcon} w={5} h={5} color="green.400" /> Yes</Td>
-                <Td textAlign="center"><Icon as={WarningIcon} w={5} h={5} color="yellow.400" /> Varies (Often buyer-centric)</Td>
-              </Tr>
-              <Tr>
-                <Td>Dispute resolution</Td>
-                <Td textAlign="center"><Icon as={CheckCircleIcon} w={5} h={5} color="green.400" /> Dedicated</Td>
-                <Td textAlign="center"><Icon as={WarningIcon} w={5} h={5} color="yellow.400" /> Standard Process</Td>
-              </Tr>
-              <Tr>
-                <Td>24/7 Dedicated Support</Td>
-                <Td textAlign="center"><Icon as={CheckCircleIcon} w={5} h={5} color="green.400" /> Yes</Td>
-                <Td textAlign="center"><Icon as={CloseIcon} w={5} h={5} color="red.400" /> Limited</Td>
-              </Tr>
-            </Tbody>
-          </Table>
+          </VStack>
         </Box>
-          {/* Stats Section */}
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8} mb={12}>
-            <Box textAlign="center"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Text fontSize="3xl" fontWeight="bold" color="purple.100">$2M+</Text>
-              <Text color="whiteAlpha.800">Secured Through Escrow</Text>
-            </Box>
-            <Box textAlign="center"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Text fontSize="3xl" fontWeight="bold" color="purple.100">1,200+</Text>
-              <Text color="whiteAlpha.800">Trusted Creators & Clients</Text>
-            </Box>
-            <Box textAlign="center"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-              <Text fontSize="3xl" fontWeight="bold" color="purple.100">40+</Text>
-              <Text color="whiteAlpha.800">Operating in Countries</Text>
-            </Box>
-          </SimpleGrid>
-          {/* Pricing Section */}
-          <Box bg="rgba(255,255,255,0.12)" borderRadius="2xl" boxShadow="2xl" p={8} mb={12} textAlign="center"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-            <Heading fontSize="2xl" color="white" mb={2}>Fair & Transparent Pricing</Heading>
-            <Text color="whiteAlpha.900" mb={2}>No upfront costs or hidden charges. We believe in simple, straightforward fees.</Text>
-            <Text fontSize="2xl" fontWeight="bold" color="purple.100" mb={2}>1% – 2.5%</Text>
-            <Text color="whiteAlpha.800" mb={4}>Escrow service fee, taken only on successful payout.</Text>
-            <Button colorScheme="whiteAlpha" variant="outline" borderColor="white" color="white" _hover={{ bg: 'whiteAlpha.200' }} size="lg">View Full Pricing Details</Button>
-          </Box>
-          {/* FAQ Accordion */}
-          <Box mb={12}>
-            <Heading fontSize="2xl" color="white" mb={4}>Frequently Asked Questions</Heading>
-            <VStack spacing={4} align="stretch">
-              <Box bg="rgba(255,255,255,0.10)" borderRadius="xl" p={4} boxShadow="md" _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-                <Text color="white" fontWeight="bold">What happens if one party doesn’t fulfill their side?</Text>
-                <Text color="whiteAlpha.800">Funds are refunded if obligations aren’t met by either party.</Text>
-              </Box>
-              <Box bg="rgba(255,255,255,0.10)" borderRadius="xl" p={4} boxShadow="md"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-                <Text color="white" fontWeight="bold">Can I cancel a transaction?</Text>
-                <Text color="whiteAlpha.800">Yes, transactions can be cancelled before both sides complete their steps.</Text>
-              </Box>
-              <Box bg="rgba(255,255,255,0.10)" borderRadius="xl" p={4} boxShadow="md"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-                <Text color="white" fontWeight="bold">How long do payouts take?</Text>
-                <Text color="whiteAlpha.800">Payouts are processed within 1-2 business days after completion.</Text>
-              </Box>
-              <Box bg="rgba(255,255,255,0.10)" borderRadius="xl" p={4} boxShadow="md"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-                <Text color="white" fontWeight="bold">What are the fees?</Text>
-                <Text color="whiteAlpha.800">Fees range from 1% to 2.5% depending on transaction size and method.</Text>
-              </Box>
-            </VStack>
-          </Box>
-          {/* AI Assistant Card */}
-          <Box bg="rgba(255,255,255,0.13)" borderRadius="2xl" boxShadow="2xl" p={8} mb={12} textAlign="center"_hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s">
-            <Heading fontSize="xl" color="white" mb={2}>✨ AI Assistant</Heading>
-            <Text color="whiteAlpha.900" mb={4}>Have a specific question about escrow? Ask our AI!</Text>
-            <Box mb={4}>
-              <input style={{width:'100%',padding:'16px',borderRadius:'8px',border:'none',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:'1rem'}} placeholder="Type your question here... e.g., 'How does SecureEscrow handle digital goods delivery?'" />
-            </Box>
-            <Button colorScheme="whiteAlpha" bg="white" color="purple.600" _hover={{ bg: 'gray.100' }} size="lg">Ask AI Assistant</Button>
-          </Box>
-        </Container>
-        {/* How People Use SecureEscrow Section */}
-        <Box textAlign="center" mt={8}>
-            <Text fontWeight="semibold" color="white" fontSize="xl" mb={4}>Ready to transact with confidence?</Text>
-            <HStack spacing={4} justify="center">
-              <Button colorScheme="whiteAlpha" bg="white" color="purple.600" _hover={{ bg: 'gray.100' }} size="lg">Create Your First Escrow</Button>
-              
-            </HStack>
-          </Box>
-       
-        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
-          <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
-          <ModalContent
-            bg="rgba(30, 32, 48, 0.95)"
-            borderRadius="2xl"
-            boxShadow="2xl"
-            p={{ base: 0, md: 2 }}
-            maxW="420px"
-            mx="auto"
-            color="white"
-            position="relative"
-          >
-            <Box position="absolute" top={4} right={4} zIndex={2}>
-              <Button onClick={onClose} variant="ghost" colorScheme="whiteAlpha" size="sm" borderRadius="full" _hover={{ bg: 'whiteAlpha.300' }}>
-                &#10005;
-              </Button>
-            </Box>
-            <ModalBody p={{ base: 4, md: 8 }}>
-              <Login onClose={onClose} modalMode />
-            </ModalBody>
-          </ModalContent>
-        </Modal>
       </Box>
+
+      {/* Login Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
+        <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
+        <ModalContent
+          bg="rgba(30, 32, 48, 0.95)"
+          borderRadius="2xl"
+          boxShadow="2xl"
+          p={{ base: 0, md: 2 }}
+          maxW="420px"
+          mx="auto"
+          color="white"
+          position="relative"
+        >
+          <Box position="absolute" top={4} right={4} zIndex={2}>
+            <Button onClick={onClose} variant="ghost" colorScheme="whiteAlpha" size="sm" borderRadius="full" _hover={{ bg: 'whiteAlpha.300' }}>
+              &#10005;
+            </Button>
+          </Box>
+          <ModalBody p={{ base: 4, md: 8 }}>
+            <Login onClose={onClose} modalMode />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

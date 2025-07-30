@@ -535,6 +535,7 @@ const Dashboard = () => {
               <Heading 
                 size="2xl" 
                 color="white" 
+                style={{marginTop: '5%'}}
                 mb={3}
                 bgGradient="linear(to-r, purple.300, blue.300)"
                 bgClip="text"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, VStack, Text, Icon, Heading, useColorModeValue, Grid, GridItem, Avatar, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
+import { Box, Container, VStack, Text, Icon, Heading, useColorModeValue, Grid, GridItem, Avatar, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure, Button } from '@chakra-ui/react';
 import { StarIcon } from '@chakra-ui/icons';
 import Login from './Login';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,23 +54,41 @@ const testimonialsData = [
 const TestimonialCard = ({ name, title, avatar, quote, rating }) => {
   return (
     <GridItem
-      bg="rgba(255, 255, 255, 0.1)"
-      backdropFilter="blur(10px)"
-      p={6}
-      borderRadius="xl"
-      boxShadow="xl"
+      bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
+      backdropFilter="blur(20px)"
+      p={8}
+      borderRadius="3xl"
+      boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
+      border="1px solid"
+      borderColor="whiteAlpha.200"
       color="white"
-      _hover={{ transform: 'scale(1.05)' }}
-                transition="all 0.5s"
+      _hover={{
+        transform: 'translateY(-4px) scale(1.02)',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
+        borderColor: 'purple.300',
+        bg: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%)',
+        backdropFilter: 'blur(25px)'
+      }}
+      transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+      position="relative"
+      overflow="hidden"
     >
-      <Box display="flex" alignItems="center" mb={4} >
+      <Box
+        position="absolute"
+        top="0"
+        left="0"
+        right="0"
+        h="1px"
+        bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
+      />
+      <Box display="flex" alignItems="center" mb={6}>
         <Avatar name={name} src={avatar} size="lg" mr={4} />
         <Box>
-          <Heading size="md">{name}</Heading>
+          <Heading size="md" color="white">{name}</Heading>
           <Text fontSize="sm" color="purple.200">{title}</Text>
         </Box>
       </Box>
-      <Text mb={4} fontStyle="italic">"{quote}"</Text>
+      <Text mb={6} fontStyle="italic" color="gray.300" lineHeight="1.6">"{quote}"</Text>
       <Box display="flex" gap={1}>
         {Array(5)
           .fill('')
@@ -85,47 +103,104 @@ const TestimonialCard = ({ name, title, avatar, quote, rating }) => {
 const Testimonials = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
-  const textColor = 'white';
 
   return (
-    <Box minH="100vh" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative">
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
-      <Box pt={24} pb={12} px={4}>
-        <Container maxW="container.xl" className="absolute inset-0 bg-gradient-to-br from-indigo-700/70 to-purple-700/70 backdrop-blur-sm">
-          <Heading as="h1" size="3xl" textAlign="center" mb={4} fontWeight="bold" color="white">
-            What Our Users Say
-          </Heading>
-          <Text fontSize="xl" textAlign="center" mb={12} color="purple.100">
-            Trusted by businesses and individuals worldwide
-          </Text>
-          <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }} gap={8} >
-            {testimonialsData.map((testimonial, index) => (
-              <TestimonialCard key={index} {...testimonial} />
-            ))}
-          </Grid>
-        </Container>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
-          <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
-          <ModalContent
-            bg="rgba(30, 32, 48, 0.95)"
-            borderRadius="2xl"
-            boxShadow="2xl"
-            p={{ base: 0, md: 2 }}
-            maxW="420px"
-            mx="auto"
-            color="white"
-            position="relative"
-          >
-            <Box position="absolute" top={4} right={4} zIndex={2}>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>&#10005;</button>
+      <Box position="relative" zIndex={1}>
+        <Box maxW="1400px" mx="auto" px={6} py={8}>
+          <VStack spacing={12} align="stretch">
+            {/* Enhanced Header */}
+            <Box textAlign="center" mb={8} position="relative">
+              <Box
+                position="absolute"
+                top="-20px"
+                left="50%"
+                transform="translateX(-50%)"
+                w="300px"
+                h="300px"
+                bg="linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%)"
+                borderRadius="full"
+                filter="blur(60px)"
+                zIndex={-1}
+              />
+              <Heading 
+                size="2xl" 
+                color="white" 
+                mb={3}
+                bgGradient="linear(to-r, purple.300, blue.300)"
+                bgClip="text"
+                fontWeight="bold"
+                style={{marginTop: '5%'}}
+              >
+                What Our Users Say
+              </Heading>
+              <Text color="gray.300" fontSize="lg" fontWeight="medium" mb={6}>
+                Trusted by thousands of users worldwide
+              </Text>
             </Box>
-            <ModalBody p={{ base: 4, md: 8 }}>
-              <Login onClose={onClose} modalMode />
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+
+            {/* Testimonials Grid with Backdrop Hover */}
+            <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={8}>
+              {testimonialsData.map((testimonial, index) => (
+                <TestimonialCard key={index} {...testimonial} />
+              ))}
+            </Grid>
+
+            {/* Call to Action */}
+            <Box textAlign="center" mt={16}>
+              <Text fontWeight="semibold" color="white" fontSize="xl" mb={6}>
+                Ready to join thousands of satisfied users?
+              </Text>
+              <Button 
+                bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+                color="white"
+                size="lg"
+                _hover={{
+                  bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+                }}
+                _active={{
+                  transform: 'translateY(0px)'
+                }}
+                fontWeight="bold"
+                borderRadius="xl"
+                px={8}
+                py={6}
+                transition="all 0.3s"
+              >
+                Start Your First Transaction
+              </Button>
+            </Box>
+          </VStack>
+        </Box>
       </Box>
+
+      {/* Login Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
+        <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
+        <ModalContent
+          bg="rgba(30, 32, 48, 0.95)"
+          borderRadius="2xl"
+          boxShadow="2xl"
+          p={{ base: 0, md: 2 }}
+          maxW="420px"
+          mx="auto"
+          color="white"
+          position="relative"
+        >
+          <Box position="absolute" top={4} right={4} zIndex={2}>
+            <Button onClick={onClose} variant="ghost" colorScheme="whiteAlpha" size="sm" borderRadius="full" _hover={{ bg: 'whiteAlpha.300' }}>
+              &#10005;
+            </Button>
+          </Box>
+          <ModalBody p={{ base: 4, md: 8 }}>
+            <Login onClose={onClose} modalMode />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };
