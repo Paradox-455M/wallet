@@ -60,3 +60,20 @@ CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- New: Encrypted transaction file storage
+CREATE TABLE IF NOT EXISTS transaction_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  enc_key BYTEA NOT NULL,
+  enc_iv BYTEA NOT NULL,
+  enc_tag BYTEA NOT NULL,
+  enc_blob BYTEA NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_transaction_files_tx_id ON transaction_files(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_files_created_at ON transaction_files(created_at DESC);

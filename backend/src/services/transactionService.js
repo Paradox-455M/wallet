@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const { createPaymentIntent, transferToSeller, confirmPaymentIntent } = require('../config/stripe');
-const { getSignedUrl } = require('../config/s3');
 const EmailService = require('./emailService');
 const Transaction = require('../models/Transaction');
 
@@ -107,13 +106,7 @@ class TransactionService {
   }
 
   static async getDownloadUrl(transactionId) {
-    const transaction = await this.getTransaction(transactionId);
-    
-    if (!transaction.file_uploaded) {
-      throw new Error('File not yet uploaded');
-    }
-
-    return getSignedUrl(transaction.file_key);
+    throw new Error('Direct download URL is not supported. Use the download endpoint.');
   }
 
   static async checkAndCompleteTransaction(transactionId) {

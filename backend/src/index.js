@@ -12,6 +12,9 @@ const User = require('./models/User'); // Assuming User model path
 // Load environment variables
 dotenv.config();
 
+// Validate and load app configuration (fails fast on invalid config)
+const appConfig = require('./config/env');
+
 // Initialize database tables
 const { createTables } = require('./migrations/001_create_tables');
 (async () => {
