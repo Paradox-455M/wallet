@@ -3,6 +3,7 @@ const router = express.Router();
 const TransactionController = require('../controllers/transactionController');
 const authController = require('../controllers/authController');
 const { validateCreateTransaction, validateTransactionId } = require('../middleware/validation');
+const { checkTransactionOwnership } = require('../middleware/auth');
 
 // Get all transactions for the current user (must be before /:transactionId route)
 router.get('/my', authController.protect, TransactionController.getUserTransactions);
@@ -15,22 +16,25 @@ router.get('/seller-data', authController.protect, TransactionController.getSell
 router.post('/', authController.protect, validateCreateTransaction, TransactionController.createTransaction);
 
 // Get transaction details
-router.get('/:transactionId', validateTransactionId, TransactionController.getTransaction);
+router.get('/:transactionId', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.getTransaction);
 
 // Get transaction timeline
-router.get('/:transactionId/timeline', validateTransactionId, TransactionController.getTransactionTimeline);
+router.get('/:transactionId/timeline', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.getTransactionTimeline);
+
+// SSE: stream transaction updates
+router.get('/:transactionId/stream', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.streamTransactionUpdates);
 
 // Transaction actions
-router.post('/:transactionId/cancel', authController.protect, validateTransactionId, TransactionController.cancelTransaction);
-router.post('/:transactionId/pay', authController.protect, validateTransactionId, TransactionController.processPayment);
+router.post('/:transactionId/cancel', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.cancelTransaction);
+router.post('/:transactionId/pay', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.processPayment);
 
 // Confirm payment received
-router.post('/:transactionId/confirm-payment', validateTransactionId, TransactionController.confirmPayment);
+router.post('/:transactionId/confirm-payment', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.confirmPayment);
 
 // Upload file for transaction
-router.post('/:transactionId/upload', authController.protect, validateTransactionId, TransactionController.uploadFile);
+router.post('/:transactionId/upload', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.uploadFile);
 
 // Get download URL for file
-router.get('/:transactionId/download', validateTransactionId, TransactionController.getDownloadUrl);
+router.get('/:transactionId/download', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.getDownloadUrl);
 
 module.exports = router;
