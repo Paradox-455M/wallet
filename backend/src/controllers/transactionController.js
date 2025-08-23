@@ -1,7 +1,9 @@
 const TransactionService = require('../services/transactionService');
-const { upload } = require('../config/s3');
 const Transaction = require('../models/Transaction');
 const { emitTransactionUpdate, subscribeToTransaction } = require('../services/eventBus');
+const { uploadMemory } = require('../config/upload');
+const { encryptBuffer, decryptToBuffer } = require('../services/cryptoService');
+const TransactionFile = require('../models/TransactionFile');
 
 class TransactionController {
   static async createTransaction(req, res) {
@@ -94,25 +96,39 @@ class TransactionController {
         return res.status(403).json({ error: 'Only the seller can upload files' });
       }
 
-      // File upload is handled by multer-s3 middleware
-      upload.single('file')(req, res, async (err) => {
+      // Use memory upload
+      uploadMemory.single('file')(req, res, async (err) => {
         if (err) {
-          console.error('Error uploading file:', err);
-          return res.status(400).json({ error: 'File upload failed' });
+          return res.status(err.statusCode || 400).json({ error: err.message || 'File upload failed' });
         }
 
         try {
-          const fileKey = req.file.key;
-          const fileName = req.file.originalname;
+          if (!req.file || !req.file.buffer) {
+            return res.status(400).json({ error: 'No file provided' });
+          }
 
-          const updatedTransaction = await TransactionService.updateFileInfo(
+          const { originalname, mimetype, size, buffer } = req.file;
+
+          // Encrypt in memory
+          const { wrappedKey, iv, tag, ciphertext } = encryptBuffer(buffer);
+
+          // Store encrypted file
+          await TransactionFile.create({
             transactionId,
-            fileKey,
-            fileName
-          );
+            filename: originalname,
+            mime: mimetype,
+            sizeBytes: size,
+            encKey: wrappedKey,
+            encIv: iv,
+            encTag: tag,
+            encBlob: ciphertext,
+          });
+
+          // Update transaction status so workflow can proceed
+          await Transaction.updateFileStatus(transactionId, 'n/a', originalname);
 
           // Emit file uploaded
-          emitTransactionUpdate(transactionId, { type: 'file_uploaded', fileName });
+          emitTransactionUpdate(transactionId, { type: 'file_uploaded', fileName: originalname });
 
           const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
 
@@ -122,11 +138,11 @@ class TransactionController {
 
           res.json({
             message: 'File uploaded successfully',
-            transaction: checkedTransaction
+            transaction: checkedTransaction,
           });
         } catch (error) {
-          console.error('Error updating transaction with file info:', error);
-          res.status(500).json({ error: 'Failed to update transaction with file info' });
+          console.error('Error storing encrypted file:', error);
+          res.status(500).json({ error: 'Failed to store encrypted file' });
         }
       });
     } catch (error) {
@@ -138,12 +154,38 @@ class TransactionController {
   static async getDownloadUrl(req, res) {
     try {
       const { transactionId } = req.params;
-      const downloadUrl = await TransactionService.getDownloadUrl(transactionId);
-      
-      res.json({ downloadUrl });
+      // Instead of URL, stream decrypted file if requester is buyer
+      const transaction = await TransactionService.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      if (!req.user || (req.user.email !== transaction.buyer_email && req.user.email !== transaction.seller_email)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Fetch latest file metadata
+      const meta = await TransactionFile.findLatestMetadataByTransactionId(transactionId);
+      if (!meta) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      // Get encrypted parts
+      const parts = await TransactionFile.getEncryptedParts(meta.id);
+      if (!parts) {
+        return res.status(404).json({ error: 'File data not found' });
+      }
+
+      // Decrypt fully into memory then send (for simplicity; can be chunked/streamed in future)
+      const plaintext = decryptToBuffer(parts.enc_key, parts.enc_iv, parts.enc_tag, parts.enc_blob);
+
+      res.setHeader('Content-Type', parts.mime);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(parts.filename)}"`);
+      res.setHeader('Content-Length', String(parts.size_bytes));
+      return res.end(plaintext);
     } catch (error) {
-      console.error('Error generating download URL:', error);
-      res.status(500).json({ error: 'Failed to generate download URL' });
+      console.error('Error serving download:', error);
+      res.status(500).json({ error: 'Failed to serve download' });
     }
   }
 
