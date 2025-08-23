@@ -22,13 +22,16 @@ const upload = multer({
     s3: s3,
     bucket: process.env.AWS_BUCKET_NAME,
     acl: 'private',
-    metadata: (req, file) => ({
-      'Content-Type': file.mimetype,
-      'transaction-id': req.params.transactionId
-    }),
-    key: (req, file) => {
+    metadata: (req, file, cb) => {
+      cb(null, {
+        'Content-Type': file.mimetype,
+        'transaction-id': req.params.transactionId
+      });
+    },
+    key: (req, file, cb) => {
       const fileExtension = file.originalname.split('.').pop();
-      return `uploads/${uuidv4()}.${fileExtension}`;
+      const key = `uploads/${uuidv4()}.${fileExtension}`;
+      cb(null, key);
     }
   }),
   limits: {

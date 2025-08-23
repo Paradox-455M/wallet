@@ -1,6 +1,7 @@
 const TransactionService = require('../services/transactionService');
 const { upload } = require('../config/s3');
 const Transaction = require('../models/Transaction');
+const { emitTransactionUpdate, subscribeToTransaction } = require('../services/eventBus');
 
 class TransactionController {
   static async createTransaction(req, res) {
@@ -15,8 +16,6 @@ class TransactionController {
       }
       
       const buyerEmail = req.user.email;
-      console.log('req.user:', req.user);
-      console.log('req.user.email:', req.user.email);
       
       const transactionId = await TransactionService.createTransaction(
         buyerEmail,
@@ -26,6 +25,9 @@ class TransactionController {
       );
 
       const clientSecret = await TransactionService.initiatePayment(transactionId, amount);
+
+      // Emit creation event
+      emitTransactionUpdate(transactionId, { type: 'created', amount, itemDescription, buyerEmail, sellerEmail });
 
       res.json({
         transactionId,
@@ -59,11 +61,18 @@ class TransactionController {
       const { transactionId } = req.params;
       const transaction = await TransactionService.confirmPaymentReceived(transactionId);
       
-      await TransactionService.checkAndCompleteTransaction(transactionId);
+      // Emit payment confirmed
+      emitTransactionUpdate(transactionId, { type: 'payment_confirmed', amount: transaction.amount });
+
+      const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
+      
+      if (checkedTransaction.status === 'completed') {
+        emitTransactionUpdate(transactionId, { type: 'completed', amount: checkedTransaction.amount });
+      }
       
       res.json({
         message: 'Payment confirmed successfully',
-        transaction
+        transaction: checkedTransaction
       });
     } catch (error) {
       console.error('Error confirming payment:', error);
@@ -102,11 +111,18 @@ class TransactionController {
             fileName
           );
 
-          await TransactionService.checkAndCompleteTransaction(transactionId);
+          // Emit file uploaded
+          emitTransactionUpdate(transactionId, { type: 'file_uploaded', fileName });
+
+          const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
+
+          if (checkedTransaction.status === 'completed') {
+            emitTransactionUpdate(transactionId, { type: 'completed', amount: checkedTransaction.amount });
+          }
 
           res.json({
             message: 'File uploaded successfully',
-            transaction: updatedTransaction
+            transaction: checkedTransaction
           });
         } catch (error) {
           console.error('Error updating transaction with file info:', error);
@@ -231,6 +247,9 @@ class TransactionController {
 
       const updatedTransaction = await Transaction.updateStatus(transactionId, 'cancelled');
 
+      // Emit cancelled event
+      emitTransactionUpdate(transactionId, { type: 'cancelled' });
+
       res.json({
         message: 'Transaction cancelled successfully',
         transaction: updatedTransaction
@@ -267,6 +286,9 @@ class TransactionController {
       }
 
       const updatedTransaction = await Transaction.updatePaymentStatus(transactionId, true);
+
+      // Emit payment processed (simulation)
+      emitTransactionUpdate(transactionId, { type: 'payment_processed', amount: updatedTransaction.amount });
 
       res.json({
         message: 'Payment processed successfully',
@@ -333,6 +355,38 @@ class TransactionController {
       console.error('Error fetching transaction timeline:', error);
       res.status(500).json({ error: 'Failed to fetch transaction timeline' });
     }
+  }
+
+  // Server-Sent Events stream for real-time transaction updates
+  static async streamTransactionUpdates(req, res) {
+    const { transactionId } = req.params;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Send initial event to confirm connection
+    res.write(`event: connected\n`);
+    res.write(`data: {"transactionId":"${transactionId}"}\n\n`);
+
+    const listener = (event) => {
+      res.write(`event: update\n`);
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    const unsubscribe = subscribeToTransaction(transactionId, listener);
+
+    // Keep-alive ping every 25s to prevent intermediary timeouts
+    const keepAlive = setInterval(() => {
+      res.write(`event: ping\n`);
+      res.write(`data: ${Date.now()}\n\n`);
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+      res.end();
+    });
   }
 }
 

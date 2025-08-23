@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit');
 const passport = require('./config/passport'); // Your passport configuration
 const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
 const User = require('./models/User'); // Assuming User model path
@@ -25,28 +26,33 @@ const { createTables } = require('./migrations/001_create_tables');
 
 const app = express();
 
-// Middleware
+// Security & middleware
 app.use(helmet());
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json());
 
-// Session middleware - required for Passport session (though we'll primarily use JWT for API auth)
-// If you don't plan to use server-side sessions at all with Passport (e.g. for OAuth redirects before token generation),
-// you might not strictly need express-session, but it's often included with Passport setups.
-// For pure JWT, this might be optional or configured differently.
+const allowedOrigin = process.env.FRONTEND_URL || '*';
+app.use(cors({
+  origin: allowedOrigin === '*' ? true : allowedOrigin,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+}));
+
+app.use(morgan('dev'));
+app.use(express.json({ limit: '2mb' }));
+
+// Session middleware - optional for OAuth flows
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your_very_secret_key_for_session',
   resave: false,
   saveUninitialized: false,
-  // cookie: { secure: process.env.NODE_ENV === 'production' } // Use secure cookies in production
 }));
 
 // Passport middleware
 app.use(passport.initialize());
-// app.use(passport.session()); // If using persistent login sessions with cookies
 
-// JWT Strategy is configured in passport.js
+// Rate limiting for API
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
+app.use('/api', apiLimiter);
 
 // Routes
 const transactionRoutes = require('./routes/transactionRoutes');
