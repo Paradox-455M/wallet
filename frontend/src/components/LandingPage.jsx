@@ -60,37 +60,51 @@ const LandingPage = () => {
             align="center" 
             justify="space-between"
           >
-            <VStack spacing={6} align={{ base: 'center', lg: 'flex-start' }} textAlign={{ base: 'center', lg: 'left' }} maxW={{ base: '100%', lg: '50%' }} mb={{base:10, lg:0}}>
-              <Heading as="h1" size={{base: '2xl', md: '3xl', lg: '4xl'}} fontWeight="bold">
+            <VStack spacing={6} align={{ base: 'center', lg: 'flex-start' }} textAlign={{ base: 'center', lg: 'left' }} maxW={{ base: '100%', lg: '54%' }} mb={{ base: 10, lg: 0 }}>
+              <Text as="span" fontSize="sm" fontWeight="600" color="purple.300" textTransform="uppercase" letterSpacing="wider">
+                Secure Escrow for Digital Goods
+              </Text>
+              <Heading as="h1" size={{ base: '2xl', md: '3xl', lg: '4xl' }} fontWeight="700" lineHeight="1.2" letterSpacing="-0.02em">
                 Secure digital transactions made simple
               </Heading>
-              <Text fontSize={{base: 'lg', md: 'xl'}} color="gray.300">
+              <Text fontSize={{ base: 'lg', md: 'xl' }} color="gray.300" lineHeight="1.6" maxW="32rem">
                 Buy and sell with confidence. Your funds and files are protected until both sides deliver.
               </Text>
-              <HStack spacing={4} mt={4}>
-                  <Button
-                      as={Link}
-                      href="/create-transaction"
-                      bg="white"
-                      color="purple.600"
-                      size="lg"
-                      px={8}
-                      _hover={{ bg: 'gray.100' }}
-                  >
-                      Start Transaction
-                  </Button>
-                  <Button
-                      as={Link}
-                      variant="outline"
-                      borderColor="white"
-                      color="white"
-                      size="lg"
-                      href="/how-it-works"
-                      px={8}
-                      _hover={{ bg: 'rgba(255,255,255,0.1)' }}
-                  >
-                      How it works
-                  </Button>
+              <HStack spacing={4} mt={2} flexWrap="wrap" justify={{ base: 'center', lg: 'flex-start' }}>
+                <Button
+                  as={Link}
+                  href="/create-transaction"
+                  bg="white"
+                  color="purple.600"
+                  size="lg"
+                  px={8}
+                  py={6}
+                  borderRadius="xl"
+                  fontWeight="600"
+                  _hover={{ bg: 'gray.50', transform: 'translateY(-1px)' }}
+                  _active={{ transform: 'translateY(0)' }}
+                  transition="all 0.2s"
+                >
+                  Start Transaction
+                </Button>
+                <Button
+                  as={Link}
+                  variant="outline"
+                  borderWidth="2px"
+                  borderColor="whiteAlpha.400"
+                  color="white"
+                  size="lg"
+                  href="/how-it-works"
+                  px={8}
+                  py={6}
+                  borderRadius="xl"
+                  fontWeight="600"
+                  _hover={{ bg: 'whiteAlpha.100', borderColor: 'whiteAlpha.600' }}
+                  _active={{ transform: 'translateY(0)' }}
+                  transition="all 0.2s"
+                >
+                  How it works
+                </Button>
               </HStack>
             </VStack>
 

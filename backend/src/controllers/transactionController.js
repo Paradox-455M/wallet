@@ -4,6 +4,8 @@ const { emitTransactionUpdate, subscribeToTransaction } = require('../services/e
 const { uploadMemory } = require('../config/upload');
 const { encryptBuffer, decryptToBuffer } = require('../services/cryptoService');
 const TransactionFile = require('../models/TransactionFile');
+const NotificationService = require('../services/notificationService');
+const { checkUploadedFile, MAX_FILE_SIZE_BYTES } = require('../middleware/fileValidation');
 
 class TransactionController {
   static async createTransaction(req, res) {
@@ -12,24 +14,67 @@ class TransactionController {
         return res.status(401).json({ error: 'Authentication required' });
       }
       
-      const { sellerEmail, amount, itemDescription } = req.body;
-      if (!sellerEmail || !amount || !itemDescription) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      const { sellerEmail, buyerEmail, amount, itemDescription } = req.body;
+      const userEmail = req.user.email.toLowerCase();
+
+      // Validation: amount and item description always required
+      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: 'Please provide a valid amount greater than 0' });
       }
-      
-      const buyerEmail = req.user.email;
-      
+      if (!itemDescription || !itemDescription.trim() || itemDescription.trim().length < 5) {
+        return res.status(400).json({ error: 'Item description must be at least 5 characters long' });
+      }
+
+      let buyerEmailFinal;
+      let sellerEmailFinal;
+
+      // Mode 1: Create as buyer (I pay) — provide seller's email
+      if (sellerEmail && String(sellerEmail).trim()) {
+        const seller = String(sellerEmail).trim().toLowerCase();
+        if (!seller.includes('@') || !seller.includes('.')) {
+          return res.status(400).json({ error: 'Please provide a valid seller email address' });
+        }
+        if (seller === userEmail) {
+          return res.status(400).json({ error: 'You cannot create a transaction with yourself' });
+        }
+        buyerEmailFinal = userEmail;
+        sellerEmailFinal = seller;
+      }
+      // Mode 2: Create as seller (I receive) — provide buyer's email
+      else if (buyerEmail && String(buyerEmail).trim()) {
+        const buyer = String(buyerEmail).trim().toLowerCase();
+        if (!buyer.includes('@') || !buyer.includes('.')) {
+          return res.status(400).json({ error: 'Please provide a valid buyer email address' });
+        }
+        if (buyer === userEmail) {
+          return res.status(400).json({ error: 'You cannot create a transaction with yourself' });
+        }
+        buyerEmailFinal = buyer;
+        sellerEmailFinal = userEmail;
+      }
+      else {
+        return res.status(400).json({ error: 'Provide either seller email (you are the buyer) or buyer email (you are the seller)' });
+      }
+
+      const parsedAmount = parseFloat(amount);
+
       const transactionId = await TransactionService.createTransaction(
-        buyerEmail,
-        sellerEmail,
-        amount,
-        itemDescription
+        buyerEmailFinal,
+        sellerEmailFinal,
+        parsedAmount,
+        itemDescription.trim()
       );
 
-      const clientSecret = await TransactionService.initiatePayment(transactionId, amount);
+      const clientSecret = await TransactionService.initiatePayment(transactionId, parsedAmount);
 
       // Emit creation event
-      emitTransactionUpdate(transactionId, { type: 'created', amount, itemDescription, buyerEmail, sellerEmail });
+      emitTransactionUpdate(transactionId, { 
+        type: 'created', 
+        amount: parsedAmount, 
+        itemDescription: itemDescription.trim(), 
+        buyerEmail: buyerEmailFinal, 
+        sellerEmail: sellerEmailFinal 
+      });
 
       res.json({
         transactionId,
@@ -38,7 +83,16 @@ class TransactionController {
       });
     } catch (error) {
       console.error('Error creating transaction:', error);
-      res.status(500).json({ error: 'Failed to create transaction' });
+      
+      // Provide more specific error messages
+      if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        return res.status(400).json({ error: 'A transaction with these details already exists' });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to create transaction',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 
@@ -51,7 +105,23 @@ class TransactionController {
         return res.status(404).json({ error: 'Transaction not found' });
       }
 
-      res.json(transaction);
+      // If payment not received and payment intent exists, get client secret
+      let clientSecret = null;
+      if (!transaction.payment_received && transaction.stripe_payment_intent_id) {
+        try {
+          const { stripe } = require('../config/stripe');
+          const paymentIntent = await stripe.paymentIntents.retrieve(transaction.stripe_payment_intent_id);
+          clientSecret = paymentIntent.client_secret;
+        } catch (error) {
+          console.error('Error retrieving payment intent:', error);
+          // Continue without client secret if there's an error
+        }
+      }
+
+      res.json({
+        ...transaction,
+        client_secret: clientSecret
+      });
     } catch (error) {
       console.error('Error fetching transaction:', error);
       res.status(500).json({ error: 'Failed to fetch transaction' });
@@ -61,15 +131,24 @@ class TransactionController {
   static async confirmPayment(req, res) {
     try {
       const { transactionId } = req.params;
+      
+      // Verify payment with Stripe before confirming
       const transaction = await TransactionService.confirmPaymentReceived(transactionId);
       
       // Emit payment confirmed
-      emitTransactionUpdate(transactionId, { type: 'payment_confirmed', amount: transaction.amount });
+      emitTransactionUpdate(transactionId, { 
+        type: 'payment_confirmed', 
+        amount: transaction.amount 
+      });
 
+      // Check if transaction can be completed
       const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
       
       if (checkedTransaction.status === 'completed') {
-        emitTransactionUpdate(transactionId, { type: 'completed', amount: checkedTransaction.amount });
+        emitTransactionUpdate(transactionId, { 
+          type: 'completed', 
+          amount: checkedTransaction.amount 
+        });
       }
       
       res.json({
@@ -78,7 +157,16 @@ class TransactionController {
       });
     } catch (error) {
       console.error('Error confirming payment:', error);
-      res.status(500).json({ error: 'Failed to confirm payment' });
+      
+      // Provide more specific error messages
+      if (error.message.includes('not been completed') || error.message.includes('verification failed')) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to confirm payment',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 
@@ -91,10 +179,12 @@ class TransactionController {
         return res.status(404).json({ error: 'Transaction not found' });
       }
 
-      // Check if user is the seller
-      if (req.user && transaction.seller_email !== req.user.email) {
-        return res.status(403).json({ error: 'Only the seller can upload files' });
+      const isSeller = req.user && transaction.seller_email === req.user.email;
+      const isBuyer = req.user && transaction.buyer_email === req.user.email;
+      if (!isSeller && !isBuyer) {
+        return res.status(403).json({ error: 'Only the buyer or seller can upload files for this transaction' });
       }
+      const fileType = isBuyer ? 'buyer' : 'seller';
 
       // Use memory upload
       uploadMemory.single('file')(req, res, async (err) => {
@@ -107,12 +197,15 @@ class TransactionController {
             return res.status(400).json({ error: 'No file provided' });
           }
 
+          const validation = checkUploadedFile(req.file, { maxSize: MAX_FILE_SIZE_BYTES });
+          if (!validation.valid) {
+            return res.status(400).json({ error: validation.error });
+          }
+
           const { originalname, mimetype, size, buffer } = req.file;
 
-          // Encrypt in memory
           const { wrappedKey, iv, tag, ciphertext } = encryptBuffer(buffer);
 
-          // Store encrypted file
           await TransactionFile.create({
             transactionId,
             filename: originalname,
@@ -122,20 +215,28 @@ class TransactionController {
             encIv: iv,
             encTag: tag,
             encBlob: ciphertext,
+            fileType,
           });
 
-          // Update transaction status so workflow can proceed
+          if (fileType === 'buyer') {
+            await Transaction.updateBuyerFileStatus(transactionId, originalname);
+            const updated = await TransactionService.getTransaction(transactionId);
+            res.json({ message: 'Requirements file uploaded successfully', transaction: updated });
+            return;
+          }
+
           await Transaction.updateFileStatus(transactionId, 'n/a', originalname);
-
-          // Emit file uploaded
           emitTransactionUpdate(transactionId, { type: 'file_uploaded', fileName: originalname });
-
+          await NotificationService.notifyFileUploaded(
+            transactionId,
+            transaction.buyer_email,
+            transaction.seller_email,
+            originalname
+          );
           const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
-
           if (checkedTransaction.status === 'completed') {
             emitTransactionUpdate(transactionId, { type: 'completed', amount: checkedTransaction.amount });
           }
-
           res.json({
             message: 'File uploaded successfully',
             transaction: checkedTransaction,
@@ -154,7 +255,7 @@ class TransactionController {
   static async getDownloadUrl(req, res) {
     try {
       const { transactionId } = req.params;
-      // Instead of URL, stream decrypted file if requester is buyer
+      const wantBuyerFile = req.query.file === 'buyer';
       const transaction = await TransactionService.getTransaction(transactionId);
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found' });
@@ -164,21 +265,25 @@ class TransactionController {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // Fetch latest file metadata
-      const meta = await TransactionFile.findLatestMetadataByTransactionId(transactionId);
+      const fileType = wantBuyerFile ? 'buyer' : 'seller';
+      if (wantBuyerFile && req.user.email !== transaction.seller_email) {
+        return res.status(403).json({ error: 'Only the seller can download the buyer\'s requirements file' });
+      }
+      if (!wantBuyerFile && req.user.email !== transaction.buyer_email) {
+        return res.status(403).json({ error: 'Only the buyer can download the deliverable file' });
+      }
+
+      const meta = await TransactionFile.findLatestMetadataByTransactionId(transactionId, fileType);
       if (!meta) {
         return res.status(404).json({ error: 'File not found' });
       }
 
-      // Get encrypted parts
       const parts = await TransactionFile.getEncryptedParts(meta.id);
       if (!parts) {
         return res.status(404).json({ error: 'File data not found' });
       }
 
-      // Decrypt fully into memory then send (for simplicity; can be chunked/streamed in future)
       const plaintext = decryptToBuffer(parts.enc_key, parts.enc_iv, parts.enc_tag, parts.enc_blob);
-
       res.setHeader('Content-Type', parts.mime);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(parts.filename)}"`);
       res.setHeader('Content-Length', String(parts.size_bytes));
@@ -205,7 +310,7 @@ class TransactionController {
     }
   }
 
-  // New endpoint: Get buyer transactions and statistics
+  // New endpoint: Get buyer transactions and statistics (optional: ?search= &status=)
   static async getBuyerData(req, res) {
     try {
       if (!req.user || !req.user.email) {
@@ -213,8 +318,10 @@ class TransactionController {
       }
 
       const userEmail = req.user.email;
+      const search = (req.query.search && String(req.query.search).trim()) || undefined;
+      const status = (req.query.status && String(req.query.status).trim()) || undefined;
       const [transactions, stats] = await Promise.all([
-        Transaction.findByBuyerEmail(userEmail),
+        Transaction.findByBuyerEmail(userEmail, { search, status }),
         Transaction.getBuyerStats(userEmail)
       ]);
 
@@ -233,7 +340,7 @@ class TransactionController {
     }
   }
 
-  // New endpoint: Get seller transactions and statistics
+  // New endpoint: Get seller transactions and statistics (optional: ?search= &status=)
   static async getSellerData(req, res) {
     try {
       if (!req.user || !req.user.email) {
@@ -241,8 +348,10 @@ class TransactionController {
       }
 
       const userEmail = req.user.email;
+      const search = (req.query.search && String(req.query.search).trim()) || undefined;
+      const status = (req.query.status && String(req.query.status).trim()) || undefined;
       const [transactions, stats] = await Promise.all([
-        Transaction.findBySellerEmail(userEmail),
+        Transaction.findBySellerEmail(userEmail, { search, status }),
         Transaction.getSellerStats(userEmail)
       ]);
 
@@ -292,6 +401,13 @@ class TransactionController {
       // Emit cancelled event
       emitTransactionUpdate(transactionId, { type: 'cancelled' });
 
+      // In-app notifications for both parties
+      await NotificationService.notifyTransactionCancelled(
+        transactionId,
+        transaction.buyer_email,
+        transaction.seller_email
+      );
+
       res.json({
         message: 'Transaction cancelled successfully',
         transaction: updatedTransaction
@@ -302,7 +418,51 @@ class TransactionController {
     }
   }
 
-  // New endpoint: Process payment (simulation for now)
+  // Admin only: Refund a transaction
+  static async refundTransaction(req, res) {
+    try {
+      const { transactionId } = req.params;
+      const { reason, amount: refundAmount } = req.body || {};
+
+      const transaction = await Transaction.findById(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      if (!transaction.stripe_payment_intent_id) {
+        return res.status(400).json({ error: 'No payment intent found for this transaction' });
+      }
+
+      if (!transaction.payment_received) {
+        return res.status(400).json({ error: 'Payment was not received; nothing to refund' });
+      }
+
+      if (transaction.status === 'refunded') {
+        return res.status(400).json({ error: 'Transaction already refunded' });
+      }
+
+      const { createRefund } = require('../config/stripe');
+      await createRefund(transaction.stripe_payment_intent_id, {
+        reason: reason || 'requested_by_customer',
+        amount: refundAmount ? parseFloat(refundAmount) : undefined,
+      });
+
+      const updatedTransaction = await Transaction.updateStatus(transactionId, 'refunded');
+
+      emitTransactionUpdate(transactionId, { type: 'refunded' });
+
+      res.json({
+        message: 'Refund processed successfully',
+        transaction: updatedTransaction,
+      });
+    } catch (error) {
+      console.error('Error processing refund:', error);
+      const message = error.message || 'Failed to process refund';
+      res.status(400).json({ error: message });
+    }
+  }
+
+  // Process payment - verify with Stripe before marking as received
   static async processPayment(req, res) {
     try {
       if (!req.user || !req.user.email) {
@@ -327,18 +487,53 @@ class TransactionController {
         return res.status(400).json({ error: 'Payment already processed' });
       }
 
-      const updatedTransaction = await Transaction.updatePaymentStatus(transactionId, true);
+      // Verify payment with Stripe if payment intent exists
+      if (transaction.stripe_payment_intent_id) {
+        const { confirmPaymentIntent } = require('../config/stripe');
+        const paymentSucceeded = await confirmPaymentIntent(transaction.stripe_payment_intent_id);
+        
+        if (!paymentSucceeded) {
+          return res.status(400).json({ 
+            error: 'Payment has not been completed. Please complete the payment in Stripe first.' 
+          });
+        }
+      }
 
-      // Emit payment processed (simulation)
-      emitTransactionUpdate(transactionId, { type: 'payment_processed', amount: updatedTransaction.amount });
+      // Use TransactionService to properly confirm payment
+      const updatedTransaction = await TransactionService.confirmPaymentReceived(transactionId);
+
+      // Check if transaction can be completed
+      const checkedTransaction = await TransactionService.checkAndCompleteTransaction(transactionId);
+
+      // Emit payment processed
+      emitTransactionUpdate(transactionId, { 
+        type: 'payment_processed', 
+        amount: updatedTransaction.amount 
+      });
+
+      if (checkedTransaction.status === 'completed') {
+        emitTransactionUpdate(transactionId, { 
+          type: 'completed', 
+          amount: checkedTransaction.amount 
+        });
+      }
 
       res.json({
         message: 'Payment processed successfully',
-        transaction: updatedTransaction
+        transaction: checkedTransaction
       });
     } catch (error) {
       console.error('Error processing payment:', error);
-      res.status(500).json({ error: 'Failed to process payment' });
+      
+      // Provide more specific error messages
+      if (error.message.includes('not been completed')) {
+        return res.status(400).json({ error: error.message });
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to process payment',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   }
 

@@ -4,7 +4,8 @@ import {
   useDisclosure, HStack, Flex, Badge, Icon, Button, Tabs, TabList, TabPanels, Tab, 
   TabPanel, Divider, Tooltip, useToast, Progress, Input, Select, InputGroup, InputLeftElement,
   CircularProgress, CircularProgressLabel, SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText,
-  StatArrow, Alert, AlertIcon, Spinner, Menu, MenuButton, MenuList, MenuItem, IconButton
+  StatArrow, Alert, AlertIcon, Spinner, Menu, MenuButton, MenuList, MenuItem, IconButton,
+  Skeleton
 } from '@chakra-ui/react';
 import { 
   CheckCircleIcon, TimeIcon, ArrowForwardIcon, ViewIcon, DownloadIcon, CopyIcon, 
@@ -15,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Login from '../pages/Login';
 import Navbar from '../components/Navbar';
 import StarryBackground from '../components/StarryBackground';
+import Onboarding from '../components/Onboarding';
 import axios from 'axios';
 
 const statCardStyle = {
@@ -85,6 +87,11 @@ const statusBadge = (status) => {
       bg: 'linear-gradient(135deg, #F56565 0%, #E53E3E 100%)',
       color: 'white',
       boxShadow: '0 4px 12px rgba(245, 101, 101, 0.3)'
+    },
+    REFUNDED: {
+      bg: 'linear-gradient(135deg, #9F7AEA 0%, #805AD5 100%)',
+      color: 'white',
+      boxShadow: '0 4px 12px rgba(159, 122, 234, 0.3)'
     }
   };
 
@@ -123,6 +130,7 @@ const Dashboard = () => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('ALL');
   const [realTimeUpdates, setRealTimeUpdates] = useState(true);
@@ -215,17 +223,17 @@ const Dashboard = () => {
     });
   }, [buyerData, sellerData]);
 
-  // Fetch buyer data
-  const fetchBuyerData = async () => {
+  // Fetch buyer data (optional search & status filter)
+  const fetchBuyerData = React.useCallback(async (opts = {}) => {
     try {
       const token = localStorage.getItem('token');
-      console.log('Fetching buyer data with token:', token ? 'present' : 'missing');
+      const params = {};
+      if (opts.search != null && String(opts.search).trim()) params.search = String(opts.search).trim();
+      if (opts.status != null && opts.status !== 'ALL') params.status = opts.status;
       const response = await axios.get('/api/transactions/buyer-data', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
+        params,
       });
-      console.log('Buyer data response:', response.data);
       setBuyerData(response.data);
     } catch (error) {
       console.error('Error fetching buyer data:', error);
@@ -237,16 +245,18 @@ const Dashboard = () => {
         isClosable: true,
       });
     }
-  };
+  }, [toast]);
 
-  // Fetch seller data
-  const fetchSellerData = async () => {
+  // Fetch seller data (optional search & status filter)
+  const fetchSellerData = React.useCallback(async (opts = {}) => {
     try {
       const token = localStorage.getItem('token');
+      const params = {};
+      if (opts.search != null && String(opts.search).trim()) params.search = String(opts.search).trim();
+      if (opts.status != null && opts.status !== 'ALL') params.status = opts.status;
       const response = await axios.get('/api/transactions/seller-data', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
+        params,
       });
       setSellerData(response.data);
     } catch (error) {
@@ -259,23 +269,31 @@ const Dashboard = () => {
         isClosable: true,
       });
     }
-  };
+  }, [toast]);
 
-  // Load data on component mount
-  React.useEffect(() => {
-    const loadData = async () => {
-      console.log('Loading dashboard data...');
+  // Debounce search term (400ms) to avoid refetch on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Load data on mount and when debounced search / status filter changes
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchBuyerData(), fetchSellerData()]);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
+        await Promise.all([
+          fetchBuyerData({ search: debouncedSearch, status: statusFilter }),
+          fetchSellerData({ search: debouncedSearch, status: statusFilter }),
+        ]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-    loadData();
-  }, []);
+    run();
+    return () => { cancelled = true; };
+  }, [debouncedSearch, statusFilter, fetchBuyerData, fetchSellerData]);
 
   // Helper functions for buyer view
   const getBuyerStats = () => {
@@ -404,6 +422,7 @@ const Dashboard = () => {
   // Helper functions for transaction processing
   const getTransactionStatus = (transaction) => {
     if (transaction.status === 'completed') return 'COMPLETE';
+    if (transaction.status === 'refunded') return 'REFUNDED';
     if (transaction.payment_received && !transaction.file_uploaded) return 'AWAITING FILE';
     if (!transaction.payment_received) return 'AWAITING PAYMENT';
     if (transaction.status === 'cancelled') return 'CANCELLED';
@@ -412,7 +431,7 @@ const Dashboard = () => {
 
   const getPayoutStatus = (transaction) => {
     if (transaction.status === 'completed') return `Paid ($${transaction.amount})`;
-    if (transaction.status === 'cancelled') return `Refunded (-$${transaction.amount})`;
+    if (transaction.status === 'cancelled' || transaction.status === 'refunded') return `Refunded (-$${transaction.amount})`;
     return '--';
   };
 
@@ -667,28 +686,7 @@ const Dashboard = () => {
     });
   };
 
-  // Enhanced filtering functions
-  const getFilteredTransactions = (data) => {
-    // Ensure data is an array
-    const dataArray = Array.isArray(data) ? data : [];
-    
-    return dataArray.filter(item => {
-      const matchesSearch = item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.buyer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.seller?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.item?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.counterparty?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
-      
-      const matchesDate = dateFilter === 'ALL' || 
-                         (dateFilter === 'TODAY' && isToday(new Date(item.createdAt || item.created_at))) ||
-                         (dateFilter === 'WEEK' && isThisWeek(new Date(item.createdAt || item.created_at))) ||
-                         (dateFilter === 'MONTH' && isThisMonth(new Date(item.createdAt || item.created_at)));
-
-      return matchesSearch && matchesStatus && matchesDate;
-    });
-  };
+  // Export uses current lists (already filtered by API search/status)
 
   const isToday = (date) => {
     const today = new Date();
@@ -706,12 +704,16 @@ const Dashboard = () => {
     return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
   };
 
-  // Export functionality
+  // Export functionality (uses current filtered list)
   const exportTransactions = (data, type) => {
-    const csvContent = data.map(item => 
-      `${item.id},${item.title},${item.amount},${item.status},${item.createdAt}`
-    ).join('\n');
-    
+    const row = (item) => [
+      item.id,
+      item.title || item.item,
+      item.amount,
+      item.status,
+      item.createdAt || item.date || item.details?.created || ''
+    ].join(',');
+    const csvContent = data.map(row).join('\n');
     const blob = new Blob([`ID,Title,Amount,Status,Date\n${csvContent}`], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -719,7 +721,6 @@ const Dashboard = () => {
     a.download = `${type}_transactions_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-    
     toast({
       title: 'Export Successful',
       description: `${type} transactions exported successfully`,
@@ -783,12 +784,12 @@ const Dashboard = () => {
       boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
       border="1px solid"
       borderColor="whiteAlpha.200"
-      p={6}
+      p={{ base: 4, md: 6 }}
       mb={6}
     >
-      <HStack spacing={4} justify="space-between" flexWrap="wrap">
-        <HStack spacing={4} flex={1}>
-          <InputGroup maxW="300px">
+      <HStack spacing={4} justify="space-between" flexWrap="wrap" gap={3}>
+        <HStack spacing={4} flex={1} minW={{ base: "100%", md: "auto" }}>
+          <InputGroup maxW={{ base: "100%", md: "300px" }} flex={1}>
             <InputLeftElement pointerEvents="none">
               <Icon as={SearchIcon} color="purple.300" />
             </InputLeftElement>
@@ -816,6 +817,7 @@ const Dashboard = () => {
             <option value="AWAITING FILE" style={{ backgroundColor: '#1a202c', color: 'white' }}>Awaiting File</option>
             <option value="AWAITING PAYMENT" style={{ backgroundColor: '#1a202c', color: 'white' }}>Awaiting Payment</option>
             <option value="CANCELLED" style={{ backgroundColor: '#1a202c', color: 'white' }}>Cancelled</option>
+            <option value="REFUNDED" style={{ backgroundColor: '#1a202c', color: 'white' }}>Refunded</option>
           </Select>
           
           <Select
@@ -836,7 +838,13 @@ const Dashboard = () => {
         <HStack spacing={2}>
           <Button
             leftIcon={<RepeatIcon />}
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setLoading(true);
+              Promise.all([
+                fetchBuyerData({ search: debouncedSearch, status: statusFilter }),
+                fetchSellerData({ search: debouncedSearch, status: statusFilter }),
+              ]).finally(() => setLoading(false));
+            }}
             bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
             color="white"
             _hover={{
@@ -866,21 +874,21 @@ const Dashboard = () => {
             </MenuButton>
                       <MenuList bg="gray.800" borderColor="whiteAlpha.200">
             <MenuItem 
-              onClick={() => exportTransactions(getFilteredTransactions(buyerData), 'Buyer')}
+              onClick={() => exportTransactions(getBuyerTransactions(), 'Buyer')}
               _hover={{ bg: 'whiteAlpha.100' }}
               color="white"
             >
               Export Buyer Data
             </MenuItem>
             <MenuItem 
-              onClick={() => exportTransactions(getFilteredTransactions(sellerData), 'Seller')}
+              onClick={() => exportTransactions(getSellerTransactions(), 'Seller')}
               _hover={{ bg: 'whiteAlpha.100' }}
               color="white"
             >
               Export Seller Data
             </MenuItem>
             <MenuItem 
-              onClick={() => exportTransactions(getFilteredTransactions(getAllTransactions()), 'Complete History')}
+              onClick={() => exportTransactions(getAllTransactions(), 'Complete History')}
               _hover={{ bg: 'whiteAlpha.100' }}
               color="white"
             >
@@ -898,11 +906,12 @@ const Dashboard = () => {
   }
 
   return (
-    <Box minH="100vh" bg="gray.900" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden">
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
+      <Onboarding />
       <Box position="relative" zIndex={1}>
-        <Box maxW="1400px" mx="auto" px={6} py={8}>
+        <Box maxW="1400px" mx="auto" px={{ base: 4, md: 6 }} py={{ base: 6, md: 8 }} pt={{ base: 24, md: 28 }}>
           <VStack spacing={8} align="stretch">
             {/* Enhanced Header with Real-time Indicator */}
             <Box>
@@ -1055,6 +1064,7 @@ const Dashboard = () => {
                   <FilterControls />
                   {/* Enhanced Buyer Transactions Table */}
                   <Box
+                    position="relative"
                     bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                     backdropFilter="blur(20px)"
                     borderRadius="3xl"
@@ -1103,21 +1113,45 @@ const Dashboard = () => {
                         </Box>
                         <Box as="tbody">
                           {loading ? (
-                            <Box as="tr">
-                              <Box as="td" colSpan={6} textAlign="center" py={8}>
-                                <Text color="gray.400">Loading transactions...</Text>
+                            [...Array(4)].map((_, i) => (
+                              <Box as="tr" key={`sk-buyer-${i}`}>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="24" borderRadius="full" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="16" ml="auto" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="6" width="24" borderRadius="full" mx="auto" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="20" mx="auto" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <HStack justify="center" spacing={2}>
+                                    <Skeleton height="8" width="20" borderRadius="lg" bg="whiteAlpha.200" />
+                                    <Skeleton height="8" width="20" borderRadius="lg" bg="whiteAlpha.200" />
+                                  </HStack>
+                                </Box>
                               </Box>
-                            </Box>
+                            ))
                           ) : getBuyerTransactions().length === 0 ? (
                             <Box as="tr">
-                              <Box as="td" colSpan={6} textAlign="center" py={8}>
+                              <Box as="td" colSpan={6} textAlign="center" py={12}>
                                 <VStack spacing={4}>
-                                  <Text color="gray.400">No transactions found</Text>
+                                  <Icon as={FiActivity} color="gray.500" boxSize={10} />
+                                  <Text color="gray.400" fontWeight="medium">No buyer transactions yet</Text>
+                                  <Text color="gray.500" fontSize="sm">Create a transaction to get started.</Text>
                                   <Button 
                                     colorScheme="purple" 
+                                    size="md"
                                     onClick={() => window.location.href = '/create-transaction'}
+                                    _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
                                   >
-                                    Create Your First Transaction
+                                    Create your first transaction
                                   </Button>
                                 </VStack>
                               </Box>
@@ -1140,6 +1174,7 @@ const Dashboard = () => {
                                   {tx.status === 'AWAITING PAYMENT' && <Text fontSize="xs" color={tx.details.paymentDueColor}>{tx.details.paymentDueText}</Text>}
                                   {tx.status === 'COMPLETE' && <Text fontSize="xs" color="green.300">Completed: {tx.details.completed}</Text>}
                                   {tx.status === 'CANCELLED' && <Text fontSize="xs" color="red.300">Cancelled: {tx.details.cancelled}</Text>}
+                                  {tx.status === 'REFUNDED' && <Text fontSize="xs" color="purple.300">Refunded</Text>}
                                 </VStack>
                               </Box>
                               <Box as="td" textAlign="center">
@@ -1149,7 +1184,7 @@ const Dashboard = () => {
                                       bg="linear-gradient(135deg, #4299E1 0%, #3182CE 100%)"
                                       color="white"
                                       size="sm"
-                                      onClick={() => handlePayNow(tx.id)}
+                                      onClick={() => window.location.href = `/transaction/${tx.id}`}
                                       _hover={{
                                         bg: 'linear-gradient(135deg, #3182CE 0%, #2C5282 100%)',
                                         transform: 'translateY(-1px)',
@@ -1165,6 +1200,16 @@ const Dashboard = () => {
                                       transition="all 0.2s"
                                     >
                                       Pay Now
+                                    </Button>
+                                  )}
+                                  {tx.actions.includes('View Details') && (
+                                    <Button 
+                                      colorScheme="gray" 
+                                      size="sm" 
+                                      leftIcon={<ViewIcon />}
+                                      onClick={() => window.location.href = `/transaction/${tx.id}`}
+                                    >
+                                      View Details
                                     </Button>
                                   )}
                                   {tx.actions.includes('Cancel') && (
@@ -1227,15 +1272,6 @@ const Dashboard = () => {
                                       </Button>
                                     </Tooltip>
                                   )}
-                                  {tx.actions.includes('View Details') && (
-                                    <Button 
-                                      colorScheme="gray" 
-                                      size="sm" 
-                                      leftIcon={<ViewIcon />}
-                                    >
-                                      View Details
-                                    </Button>
-                                  )}
                                 </HStack>
                               </Box>
                             </Box>
@@ -1250,6 +1286,7 @@ const Dashboard = () => {
                   <FilterControls />
                   {/* Enhanced Seller Transactions Table */}
                   <Box
+                    position="relative"
                     bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                     backdropFilter="blur(20px)"
                     borderRadius="3xl"
@@ -1298,17 +1335,35 @@ const Dashboard = () => {
                         </Box>
                         <Box as="tbody">
                           {loading ? (
-                            <Box as="tr">
-                              <Box as="td" colSpan={6} textAlign="center" py={8}>
-                                <Text color="gray.400">Loading transactions...</Text>
+                            [...Array(4)].map((_, i) => (
+                              <Box as="tr" key={`sk-seller-${i}`}>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="28" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="6" width="24" borderRadius="full" mx="auto" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="16" mx="auto" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <Skeleton height="4" width="20" mx="auto" borderRadius="md" bg="whiteAlpha.200" />
+                                </Box>
+                                <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                  <HStack justify="center"><Skeleton height="8" width="24" borderRadius="lg" bg="whiteAlpha.200" /></HStack>
+                                </Box>
                               </Box>
-                            </Box>
+                            ))
                           ) : getSellerTransactions().length === 0 ? (
                             <Box as="tr">
-                              <Box as="td" colSpan={6} textAlign="center" py={8}>
+                              <Box as="td" colSpan={6} textAlign="center" py={12}>
                                 <VStack spacing={4}>
-                                  <Text color="gray.400">No upload tasks found</Text>
-                                  <Text color="gray.500" fontSize="sm">Transactions will appear here when buyers make payments</Text>
+                                  <Icon as={FiUpload} color="gray.500" boxSize={10} />
+                                  <Text color="gray.400" fontWeight="medium">No seller tasks yet</Text>
+                                  <Text color="gray.500" fontSize="sm">Transactions will appear here when buyers pay you.</Text>
                                 </VStack>
                               </Box>
                             </Box>
@@ -1355,6 +1410,7 @@ const Dashboard = () => {
                                       colorScheme="gray" 
                                       size="sm" 
                                       leftIcon={<ViewIcon />}
+                                      onClick={() => window.location.href = `/transaction/${task.id}`}
                                     >
                                       View Details
                                     </Button>
@@ -1374,6 +1430,7 @@ const Dashboard = () => {
                   <FilterControls />
                   {/* Enhanced Transaction History Table */}
                   <Box
+                    position="relative"
                     bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                     backdropFilter="blur(20px)"
                     borderRadius="3xl"
@@ -1424,17 +1481,22 @@ const Dashboard = () => {
                         </Box>
                         <Box as="tbody">
                           {loading ? (
-                            <Box as="tr">
-                              <Box as="td" colSpan={8} textAlign="center" py={8}>
-                                <Text color="gray.400">Loading transaction history...</Text>
+                            [...Array(3)].map((_, i) => (
+                              <Box as="tr" key={`sk-history-${i}`}>
+                                {[...Array(8)].map((_, j) => (
+                                  <Box key={j} as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
+                                    <Skeleton height="4" width={j === 1 ? '32' : '20'} borderRadius="md" bg="whiteAlpha.200" />
+                                  </Box>
+                                ))}
                               </Box>
-                            </Box>
+                            ))
                           ) : getAllTransactions().length === 0 ? (
                             <Box as="tr">
-                              <Box as="td" colSpan={8} textAlign="center" py={8}>
+                              <Box as="td" colSpan={8} textAlign="center" py={12}>
                                 <VStack spacing={4}>
-                                  <Text color="gray.400">No transaction history found</Text>
-                                  <Text color="gray.500" fontSize="sm">Your transaction history will appear here</Text>
+                                  <Icon as={FiActivity} color="gray.500" boxSize={10} />
+                                  <Text color="gray.400" fontWeight="medium">No history yet</Text>
+                                  <Text color="gray.500" fontSize="sm">Your transaction history will appear here.</Text>
                                 </VStack>
                               </Box>
                             </Box>
@@ -1517,6 +1579,7 @@ const Dashboard = () => {
                                       colorScheme="gray" 
                                       size="sm" 
                                       leftIcon={<ViewIcon />}
+                                      onClick={() => window.location.href = `/transaction/${tx.id}`}
                                     >
                                       Details
                                     </Button>

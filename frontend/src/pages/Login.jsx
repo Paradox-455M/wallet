@@ -26,6 +26,7 @@ const Login = ({ onClose, modalMode }) => {
   const { login, register, handleOAuthLogin, isAuthenticated, loading, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [submitting, setSubmitting] = useState(false);
 
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', fullName: '' });
@@ -100,18 +101,32 @@ const Login = ({ onClose, modalMode }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setPageError('');
+    setEmailError('');
     clearError();
+    if (isRegisterMode && (!form.fullName || !form.fullName.trim())) {
+      setPageError('Please enter your full name.');
+      return;
+    }
+    if (!form.email || !form.email.trim()) {
+      setEmailError('Please enter your email.');
+      return;
+    }
+    if (!form.password) {
+      setPageError('Please enter your password.');
+      return;
+    }
+    setSubmitting(true);
     try {
       if (isRegisterMode) {
         await register(form.email, form.password, form.fullName);
       } else {
         await login(form.email, form.password);
       }
-      if (onClose) onClose(); // Close modal on success
-      // Let the useEffect handle the redirect for non-modal login
+      if (onClose) onClose();
     } catch (err) {
-      // Error is already set by AuthContext, or we can set pageError for local form errors
-      // setPageError(err.response?.data?.message || err.message || 'Operation failed');
+      // Error set by AuthContext
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -203,13 +218,16 @@ const Login = ({ onClose, modalMode }) => {
                 bgGradient="linear(to-r, #6B46C1, #805AD5)"
                 color="white"
                 _hover={{ bgGradient: "linear(to-r, #805AD5, #6B46C1)" }}
+                _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
                 fontWeight="bold"
                 fontSize="lg"
                 borderRadius="lg"
                 py={6}
-                isLoading={loading}
+                isLoading={loading || submitting}
+                loadingText={isRegisterMode ? 'Creating account...' : 'Signing in...'}
+                isDisabled={loading || submitting}
               >
-                {isRegisterMode ? 'Register' : 'Login'}
+                {isRegisterMode ? 'Create account' : 'Sign in'}
               </Button>
               
               <HStack my={4}>
@@ -257,17 +275,9 @@ const Login = ({ onClose, modalMode }) => {
                 </ChakraLink>
               </Text>
               {!isRegisterMode && (
-                <Button
-                  variant="link"
-                  colorScheme="blue"
-                  width="full"
-                  mt={0}
-                  fontWeight="medium"
-                  onClick={() => navigate('/forgot-password')} // Assuming you have a forgot password page route
-                  color={modalMode ? 'blue.300' : 'blue.500'}
-                >
-                  Forgot Password?
-                </Button>
+                <Text fontSize="sm" color={modalMode ? 'gray.400' : 'gray.500'} textAlign="center" mt={2}>
+                  Forgot password? Contact support for help.
+                </Text>
               )}
             </VStack>
           </form>

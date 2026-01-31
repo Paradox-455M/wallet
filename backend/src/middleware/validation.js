@@ -12,12 +12,18 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Transaction validation rules
+// Transaction validation rules: provide either sellerEmail (I'm buyer) or buyerEmail (I'm seller)
 const validateCreateTransaction = [
   body('sellerEmail')
+    .optional({ checkFalsy: true })
     .isEmail()
     .normalizeEmail()
-    .withMessage('Valid seller email is required'),
+    .withMessage('Seller email must be valid when provided'),
+  body('buyerEmail')
+    .optional({ checkFalsy: true })
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Buyer email must be valid when provided'),
   body('amount')
     .isFloat({ min: 0.01 })
     .withMessage('Amount must be a positive number greater than 0'),
@@ -25,6 +31,23 @@ const validateCreateTransaction = [
     .trim()
     .isLength({ min: 1, max: 1000 })
     .withMessage('Item description must be between 1 and 1000 characters'),
+  (req, res, next) => {
+    const hasSeller = req.body.sellerEmail && String(req.body.sellerEmail).trim();
+    const hasBuyer = req.body.buyerEmail && String(req.body.buyerEmail).trim();
+    if (!hasSeller && !hasBuyer) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: [{ msg: 'Provide either seller email (you are the buyer) or buyer email (you are the seller)' }]
+      });
+    }
+    if (hasSeller && hasBuyer) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: [{ msg: 'Provide only one: seller email (you pay) or buyer email (you sell)' }]
+      });
+    }
+    next();
+  },
   handleValidationErrors
 ];
 

@@ -20,9 +20,14 @@ router.post('/login', validateUserLogin, authController.login);
 router.get('/logout', authController.logout); // For JWT, this might just return a success message
 
 // @route   GET api/auth/me
-// @desc    Get current logged-in user
+// @desc    Get current logged-in user (includes transactionCount)
 // @access  Private
 router.get('/me', authController.protect, authController.getCurrentUser);
+
+// @route   PUT api/auth/profile
+// @desc    Update current user profile (fullName)
+// @access  Private
+router.put('/profile', authController.protect, authController.updateProfile);
 
 // @route   GET api/auth/google
 // @desc    Authenticate with Google

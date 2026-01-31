@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const TransactionController = require('../controllers/transactionController');
 const authController = require('../controllers/authController');
+const { requireAdmin } = require('../middleware/adminAuth');
 const { validateCreateTransaction, validateTransactionId } = require('../middleware/validation');
 const { checkTransactionOwnership } = require('../middleware/auth');
 
@@ -36,5 +37,8 @@ router.post('/:transactionId/upload', authController.protect, validateTransactio
 
 // Get download URL for file
 router.get('/:transactionId/download', authController.protect, validateTransactionId, checkTransactionOwnership, TransactionController.getDownloadUrl);
+
+// Admin only: Refund transaction
+router.post('/:transactionId/refund', authController.protect, requireAdmin, validateTransactionId, TransactionController.refundTransaction);
 
 module.exports = router;

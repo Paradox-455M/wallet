@@ -53,7 +53,7 @@ exports.login = (req, res, next) => {
       return res.status(401).json({ message: info.message || 'Login failed' });
     }
     const token = generateToken(user);
-    return res.json({ token, user: { id: user.id, email: user.email, fullName: user.full_name, avatarUrl: user.google_avatar_url || user.github_avatar_url } });
+    return res.json({ token, user: { id: user.id, email: user.email, fullName: user.full_name, avatarUrl: user.google_avatar_url || user.github_avatar_url, isAdmin: !!user.is_admin } });
   })(req, res, next);
 };
 
@@ -63,12 +63,56 @@ exports.logout = (req, res) => {
   res.json({ message: 'Logout successful' });
 };
 
-exports.getCurrentUser = (req, res) => {
+exports.getCurrentUser = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
-  // req.user is populated by passport.deserializeUser or a JWT authentication middleware
-  res.json({ user: { id: req.user.id, email: req.user.email, fullName: req.user.full_name, avatarUrl: req.user.google_avatar_url || req.user.github_avatar_url, createdAt: req.user.created_at } });
+  let transactionCount = 0;
+  try {
+    const Transaction = require('../models/Transaction');
+    const list = await Transaction.findByUserEmail(req.user.email);
+    transactionCount = Array.isArray(list) ? list.length : 0;
+  } catch (_) {}
+  res.json({
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      fullName: req.user.full_name,
+      avatarUrl: req.user.google_avatar_url || req.user.github_avatar_url,
+      createdAt: req.user.created_at,
+      isAdmin: !!req.user.is_admin,
+      transactionCount,
+    },
+  });
+};
+
+exports.updateProfile = async (req, res) => {
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+  const { fullName } = req.body || {};
+  if (fullName !== undefined && (typeof fullName !== 'string' || fullName.trim().length === 0)) {
+    return res.status(400).json({ message: 'Full name must be a non-empty string' });
+  }
+  try {
+    const user = await User.updateProfile(req.user.id, { fullName: fullName && fullName.trim() });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        avatarUrl: user.google_avatar_url || user.github_avatar_url,
+        createdAt: user.created_at,
+        isAdmin: !!user.is_admin,
+      },
+    });
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ message: 'Server error during profile update' });
+  }
 };
 
 // Google OAuth

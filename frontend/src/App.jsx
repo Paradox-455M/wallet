@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { ChakraProvider, Box, Container, Flex, Spacer, HStack, Button, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
+import { BrowserRouter as Router, Routes, Route, Link, useParams } from 'react-router-dom';
+import { ChakraProvider, Box, Button, Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
+import theme from './theme';
 import CreateTransaction from './components/CreateTransaction';
 import TransactionDetails from './components/TransactionDetails';
 import LandingPage from './components/LandingPage';
@@ -8,8 +9,10 @@ import Login from './pages/Login';
 import HowItWorks from './pages/HowItWorks';
 import Features from './pages/Features';
 import Testimonials from './pages/Testimonials';
-import OAuthCallback from './pages/OAuthCallback'; // Added for OAuth callback
-import Dashboard from './pages/Dashboard'; // Added for Dashboard page
+import OAuthCallback from './pages/OAuthCallback';
+import Dashboard from './pages/Dashboard';
+import UserProfile from './pages/UserProfile';
+import Admin from './pages/Admin';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Spinner } from '@chakra-ui/react';
@@ -22,7 +25,7 @@ const AppContent = ({ onOpen, onClose, isOpen }) => {
   React.useEffect(() => {
     if (!loading && !isAuthenticated) {
       // Check if we're on a protected route
-      const protectedRoutes = ['/dashboard', '/create-transaction'];
+      const protectedRoutes = ['/dashboard', '/create-transaction', '/profile', '/admin'];
       const currentPath = window.location.pathname;
       if (protectedRoutes.includes(currentPath)) {
         onOpen();
@@ -44,6 +47,8 @@ const AppContent = ({ onOpen, onClose, isOpen }) => {
           <Route path="/testimonials" element={<Testimonials />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><AdminRoute><Admin /></AdminRoute></ProtectedRoute>} />
           <Route path="/login" element={<Navigate to="/" replace />} />
                 </Routes>
         <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
@@ -78,7 +83,7 @@ const App = () => {
   
   return (
     <Router>
-      <ChakraProvider>
+      <ChakraProvider theme={theme}>
         <AuthProvider>
           <AppContent onOpen={onOpen} onClose={onClose} isOpen={isOpen} />
         </AuthProvider>
@@ -88,14 +93,26 @@ const App = () => {
 };
 
 const TransactionDetailsWrapper = () => {
-  const { transactionId } = require('react-router-dom').useParams();
+  const { transactionId } = useParams();
   return <TransactionDetails transactionId={transactionId} />;
 };
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return <Spinner />;
+  if (loading) {
+    return (
+      <Box minH="100vh" bg="gray.900" display="flex" alignItems="center" justifyContent="center">
+        <Spinner size="xl" color="purple.400" thickness="4px" />
+      </Box>
+    );
+  }
   return isAuthenticated ? children : <Navigate to="/" replace />;
+};
+
+const AdminRoute = ({ children }) => {
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.isAdmin === true;
+  return isAdmin ? children : <Navigate to="/dashboard" replace />;
 };
 
 export default App;

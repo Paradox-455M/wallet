@@ -41,6 +41,12 @@ app.use(cors({
 }));
 
 app.use(morgan('dev'));
+
+// Webhook routes must be before body parser (Stripe needs raw body)
+const webhookRoutes = require('./routes/webhookRoutes');
+app.use('/api/webhooks', webhookRoutes);
+
+// Body parser middleware (after webhooks)
 app.use(express.json({ limit: '2mb' }));
 
 // Session middleware - optional for OAuth flows
@@ -59,10 +65,18 @@ app.use('/api', apiLimiter);
 
 // Routes
 const transactionRoutes = require('./routes/transactionRoutes');
-const authRoutes = require('./routes/authRoutes'); // Import auth routes
+const authRoutes = require('./routes/authRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 app.use('/api/transactions', transactionRoutes);
-app.use('/api/auth', authRoutes); // Use auth routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+
+// Health check endpoint (before catch-all)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // Import error handling middleware
 const { globalErrorHandler, handleNotFound } = require('./middleware/errorHandler');
@@ -72,11 +86,6 @@ app.use(handleNotFound);
 
 // Global error handling middleware
 app.use(globalErrorHandler);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
 
 const PORT = process.env.PORT || 3000;
 

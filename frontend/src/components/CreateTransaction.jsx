@@ -18,6 +18,7 @@ import {
   Heading,
   Icon,
   Avatar,
+  SimpleGrid,
 } from '@chakra-ui/react';
 import { loadStripe } from '@stripe/stripe-js';
 import axios from 'axios';
@@ -35,8 +36,10 @@ const CreateTransaction = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
 
+  const [role, setRole] = useState('buyer'); // 'buyer' = I'm paying, 'seller' = I'm receiving
   const [formData, setFormData] = useState({
     sellerEmail: '',
+    buyerEmail: '',
     amount: '',
     itemDescription: '',
     currency: 'USD'
@@ -53,38 +56,111 @@ const CreateTransaction = () => {
     setFormData(prev => ({ ...prev, amount: valueString }));
   };
 
+  const validateForm = () => {
+    if (role === 'buyer') {
+      if (!formData.sellerEmail || !formData.sellerEmail.includes('@')) {
+        return 'Please enter a valid seller email address';
+      }
+    } else {
+      if (!formData.buyerEmail || !formData.buyerEmail.includes('@')) {
+        return 'Please enter a valid buyer email address';
+      }
+    }
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      return 'Please enter a valid amount greater than 0';
+    }
+    if (!formData.itemDescription || formData.itemDescription.trim().length < 5) {
+      return 'Please provide a detailed item description (at least 5 characters)';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
+
+    // Validate form
+    const validationError = validateForm();
+    if (validationError) {
+      toast({
+        title: 'Validation Error',
+        description: validationError,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top-right'
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
       const token = localStorage.getItem('token');
-      const { data } = await axios.post('/api/transactions', {
-        ...formData,
-        amount: parseFloat(formData.amount)
-      }, {
+      if (!token) {
+        throw new Error('Please log in to create a transaction');
+      }
+
+      const amount = parseFloat(formData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Invalid amount');
+      }
+
+      const payload = {
+        amount: amount,
+        itemDescription: formData.itemDescription.trim()
+      };
+      if (role === 'buyer') {
+        payload.sellerEmail = formData.sellerEmail.trim();
+      } else {
+        payload.buyerEmail = formData.buyerEmail.trim();
+      }
+      const { data } = await axios.post('/api/transactions', payload, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
 
       toast({
-        title: 'Transaction Created',
-        description: data.message || 'Your transaction has been initiated.',
+        title: 'Transaction Created Successfully! 🎉',
+        description: role === 'buyer'
+          ? 'Redirecting to payment...'
+          : 'Share the transaction link with the buyer so they can pay.',
         status: 'success',
-        duration: 5000,
+        duration: 3000,
         isClosable: true,
         position: 'top-right'
       });
 
+      if (data.transactionId) {
+        setTimeout(() => {
+          window.location.href = `/transaction/${data.transactionId}`;
+        }, 1500);
+      }
+
     } catch (error) {
+      let errorMessage = 'Failed to create transaction';
+      
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response.data?.error || 
+                      error.response.data?.message || 
+                      `Server error: ${error.response.status}`;
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else {
+        // Error in request setup
+        errorMessage = error.message || errorMessage;
+      }
+
       toast({
-        title: 'Error',
-        description: error.response?.data?.message || 'Failed to create transaction',
+        title: 'Transaction Creation Failed',
+        description: errorMessage,
         status: 'error',
-        duration: 5000,
-        isClosable: true
+        duration: 7000,
+        isClosable: true,
+        position: 'top-right'
       });
     } finally {
       setLoading(false);
@@ -133,30 +209,88 @@ const CreateTransaction = () => {
             />
             <form onSubmit={handleSubmit}>
               <VStack spacing={6}>
-                <FormControl isRequired>
-                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Seller's Email</FormLabel>
-                  <InputGroup>
-                    <InputLeftElement pointerEvents="none">
-                      <Icon as={EmailIcon} color="purple.300" />
-                    </InputLeftElement>
-                    <Input
-                      name="sellerEmail"
-                      type="email"
+                <FormControl>
+                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">I am</FormLabel>
+                  <SimpleGrid columns={2} spacing={3}>
+                    <Button
+                      type="button"
                       size="lg"
+                      variant={role === 'buyer' ? 'solid' : 'outline'}
+                      colorScheme="purple"
+                      onClick={() => setRole('buyer')}
                       borderRadius="lg"
-                      bg="rgba(255, 255, 255, 0.1)"
-                      borderColor="whiteAlpha.200"
-                      _hover={{ borderColor: 'purple.300'}}
-                      focusBorderColor="purple.300"
-                      placeholder="seller@example.com"
-                      _placeholder={{ color: 'purple.200' }}
-                      value={formData.sellerEmail}
-                      onChange={handleInputChange}
-                      pl={10}
-                      color="white"
-                    />
-                  </InputGroup>
+                      _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
+                    >
+                      Paying (Buyer)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant={role === 'seller' ? 'solid' : 'outline'}
+                      colorScheme="purple"
+                      onClick={() => setRole('seller')}
+                      borderRadius="lg"
+                      _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
+                    >
+                      Selling (Seller)
+                    </Button>
+                  </SimpleGrid>
+                  <Text fontSize="xs" color="gray.400" mt={2}>
+                    {role === 'buyer' ? "You'll pay; enter the seller's email." : "You'll deliver; enter the buyer's email."}
+                  </Text>
                 </FormControl>
+
+                {role === 'buyer' ? (
+                  <FormControl isRequired>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Seller's Email</FormLabel>
+                    <InputGroup>
+                      <InputLeftElement pointerEvents="none">
+                        <Icon as={EmailIcon} color="purple.300" />
+                      </InputLeftElement>
+                      <Input
+                        name="sellerEmail"
+                        type="email"
+                        size="lg"
+                        borderRadius="lg"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        borderColor="whiteAlpha.200"
+                        _hover={{ borderColor: 'purple.300'}}
+                        focusBorderColor="purple.300"
+                        placeholder="seller@example.com"
+                        _placeholder={{ color: 'purple.200' }}
+                        value={formData.sellerEmail}
+                        onChange={handleInputChange}
+                        pl={10}
+                        color="white"
+                      />
+                    </InputGroup>
+                  </FormControl>
+                ) : (
+                  <FormControl isRequired>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Buyer's Email</FormLabel>
+                    <InputGroup>
+                      <InputLeftElement pointerEvents="none">
+                        <Icon as={EmailIcon} color="purple.300" />
+                      </InputLeftElement>
+                      <Input
+                        name="buyerEmail"
+                        type="email"
+                        size="lg"
+                        borderRadius="lg"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        borderColor="whiteAlpha.200"
+                        _hover={{ borderColor: 'purple.300'}}
+                        focusBorderColor="purple.300"
+                        placeholder="buyer@example.com"
+                        _placeholder={{ color: 'purple.200' }}
+                        value={formData.buyerEmail}
+                        onChange={handleInputChange}
+                        pl={10}
+                        color="white"
+                      />
+                    </InputGroup>
+                  </FormControl>
+                )}
 
                 <FormControl isRequired>
                   <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Item/Service Description</FormLabel>
@@ -247,9 +381,8 @@ const CreateTransaction = () => {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
                   }}
-                  _active={{
-                    transform: 'translateY(0px)'
-                  }}
+                  _active={{ transform: 'translateY(0px)' }}
+                  _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
                   isLoading={loading}
                   isDisabled={loading}
                   py={6}
@@ -258,7 +391,7 @@ const CreateTransaction = () => {
                   borderRadius="xl"
                   transition="all 0.3s"
                 >
-                  Proceed to Secure Payment
+                  {role === 'buyer' ? 'Create & Proceed to Payment' : 'Create Transaction (share link with buyer)'}
                 </Button>
                 <Text fontSize="xs" color="purple.200" textAlign="center">
                   By clicking "Proceed", you agree to SecureEscrow's <Link as={Link} to="/terms-of-service" color="purple.100" _hover={{textDecoration: 'underline'}}>Terms of Service</Link>.

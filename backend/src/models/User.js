@@ -119,7 +119,26 @@ const User = {
 
   async comparePassword(candidatePassword, hashedPassword) {
     return bcrypt.compare(candidatePassword, hashedPassword);
-  }
+  },
+
+  async updateProfile(userId, updates) {
+    await createTableIfNotExists();
+    const setClauses = [];
+    const values = [];
+    let i = 1;
+    if (updates.fullName !== undefined && updates.fullName !== null && String(updates.fullName).trim()) {
+      setClauses.push(`full_name = $${i}`);
+      values.push(String(updates.fullName).trim());
+      i++;
+    }
+    if (setClauses.length === 0) {
+      return this.findById(userId);
+    }
+    values.push(userId);
+    const text = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${i} RETURNING *`;
+    const res = await query(text, values);
+    return res.rows[0];
+  },
 };
 
 module.exports = User;
