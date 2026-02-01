@@ -1,6 +1,7 @@
 import React from "react";
-import { Box, Container, Flex, Spacer, HStack, Button, Icon, Heading, Avatar, useColorModeValue } from "@chakra-ui/react";
+import { Box, Container, Flex, Spacer, HStack, Button, Icon, Heading, Avatar } from "@chakra-ui/react";
 import { LockIcon } from "@chakra-ui/icons";
+import { FiGrid } from "react-icons/fi";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import NotificationCenter from "./NotificationCenter";
@@ -14,8 +15,6 @@ const navLinks = [
 const Navbar = ({ onLoginOpen }) => {
   const { isAuthenticated, currentUser } = useAuth();
   const location = useLocation();
-  const bgColor = useColorModeValue("white", "gray.800");
-  const textColor = useColorModeValue("gray.800", "white");
 
   // Determine which links to show
   const currentPath = location.pathname;
@@ -87,8 +86,11 @@ const Navbar = ({ onLoginOpen }) => {
                   minH="44px"
                   whiteSpace="nowrap"
                 >
-                  <Box as="span" display={{ base: "none", sm: "inline" }}>📊 Dashboard</Box>
-                  <Box as="span" display={{ base: "inline", sm: "none" }}>📊</Box>
+                  <HStack spacing={2} display={{ base: "none", sm: "flex" }}>
+                    <Icon as={FiGrid} boxSize={4} />
+                    <Box as="span">Dashboard</Box>
+                  </HStack>
+                  <Icon as={FiGrid} boxSize={5} display={{ base: "block", sm: "none" }} />
                 </Button>
                 <Button as={RouterLink} to="/profile" variant="ghost" color="white" _hover={{ bg: "whiteAlpha.200" }} p={1} minW={0} minH="44px" h="auto" bg="transparent" title="Profile">
                   <Avatar

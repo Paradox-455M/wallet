@@ -907,7 +907,7 @@ const Dashboard = () => {
   }
 
   return (
-    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
       <Onboarding />
@@ -918,20 +918,19 @@ const Dashboard = () => {
             <Box>
               <HStack justify="space-between" align="center" mb={4}>
                 <VStack align="start" spacing={2}>
-                <Heading 
-                size="2xl" 
-                color="white" 
-                mb={3}
-                bgGradient="linear(to-r, purple.300, blue.300)"
-                bgClip="text"
-                fontWeight="bold"
-                style={{marginTop: '5%'}}
-              >
-                Dashboard
-              </Heading>
-                  <Heading size="xl" color="white" fontWeight="bold" >
-                    Welcome back, {currentUser?.email}
-                  </Heading>
+                <Heading
+                  size="2xl"
+                  color="white"
+                  mb={3}
+                  bgGradient="linear(to-r, purple.300, blue.300)"
+                  bgClip="text"
+                  fontWeight="bold"
+                >
+                  Dashboard
+                </Heading>
+                <Heading size="xl" color="white" fontWeight="bold" noOfLines={1} title={currentUser?.email}>
+                  Welcome back, {currentUser?.email}
+                </Heading>
                   <HStack spacing={2}>
                     <Box
                       w={3}
@@ -1100,8 +1099,8 @@ const Dashboard = () => {
                       />
                       Active Transactions
                     </Heading>
-                    <Box overflowX="auto">
-                      <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
+                    <Box overflowX="auto" overflowY="visible" minW="0" sx={{ '&::-webkit-scrollbar': { height: '8px' } }}>
+                      <Box as="table" w="full" minW="800px" sx={{ borderSpacing: 0 }}>
                         <Box as="thead">
                           <Box as="tr">
                             <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Item</Box>
@@ -1322,8 +1321,8 @@ const Dashboard = () => {
                       />
                       Upload Tasks
                     </Heading>
-                    <Box overflowX="auto">
-                      <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
+                    <Box overflowX="auto" minW="0" sx={{ '&::-webkit-scrollbar': { height: '8px' } }}>
+                      <Box as="table" w="full" minW="700px" sx={{ borderSpacing: 0 }}>
                         <Box as="thead">
                           <Box as="tr">
                             <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Item</Box>
@@ -1466,8 +1465,8 @@ const Dashboard = () => {
                       />
                       Complete Transaction History
                     </Heading>
-                    <Box overflowX="auto">
-                      <Box as="table" w="full" sx={{ borderSpacing: 0 }}>
+                    <Box overflowX="auto" minW="0" sx={{ '&::-webkit-scrollbar': { height: '8px' } }}>
+                      <Box as="table" w="full" minW="900px" sx={{ borderSpacing: 0 }}>
                         <Box as="thead">
                           <Box as="tr">
                             <Box as="th" {...transactionTableHeader} textAlign="left" color="whiteAlpha.700">Transaction ID</Box>

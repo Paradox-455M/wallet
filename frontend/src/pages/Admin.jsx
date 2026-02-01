@@ -107,7 +107,7 @@ const Admin = () => {
   };
 
   return (
-    <Box minH="100vh" bg="gray.900" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
       <StarryBackground />
       <Navbar />
       <Box position="relative" zIndex={1} pt={24} pb={12} px={{ base: 4, md: 6 }}>
@@ -145,6 +145,8 @@ const Admin = () => {
               borderWidth="1px"
               borderColor="whiteAlpha.200"
               overflowX="auto"
+              minW="0"
+              sx={{ '&::-webkit-scrollbar': { height: '8px' } }}
             >
               {loading ? (
                 <Box py={12} textAlign="center">

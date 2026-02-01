@@ -49,7 +49,7 @@ const LandingPage = () => {
   }
 
   return (
-    <Box minH="100vh" bg="gray.900" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
       <Box position="relative" zIndex={1}>

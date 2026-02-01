@@ -44,7 +44,7 @@ const OAuthCallback = () => {
 
   // Display a loading state or message while processing
   return (
-    <Box minH="100vh" bg="gray.900" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
       <StarryBackground />
       <Box 
         display="flex" 

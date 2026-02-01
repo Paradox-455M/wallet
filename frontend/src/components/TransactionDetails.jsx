@@ -375,7 +375,7 @@ const TransactionDetails = ({ transactionId }) => {
   ];
 
   return (
-    <Box minH="100vh" bg="gray.900" position="relative">
+    <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
       <StarryBackground />
       <Navbar />
       <Box position="relative" zIndex={1} pt={24} pb={12} px={{ base: 4, md: 6 }}>
@@ -402,37 +402,37 @@ const TransactionDetails = ({ transactionId }) => {
             borderWidth="1px"
             borderColor="gray.200"
           >
-            <VStack spacing={8} align="stretch">
+            <VStack spacing={8} align="stretch" textAlign="left">
               <Text fontSize="2xl" fontWeight="700" color="gray.800" letterSpacing="-0.02em" fontFamily="heading">
                 Transaction Details
               </Text>
 
               {/* Status Badge */}
               <Box textAlign="center" py={2}>
-          <Badge
-            fontSize="lg"
-            px={4}
-            py={2}
-            borderRadius="full"
-            colorScheme={
-              status.color === 'green.500' ? 'green' :
-              status.color === 'orange.500' ? 'orange' :
-              status.color === 'yellow.500' ? 'yellow' :
-              status.color === 'red.500' ? 'red' :
-              status.color === 'purple.500' ? 'purple' : 'gray'
-            }
-          >
-            {status.label}
-          </Badge>
-          <Text mt={2} fontSize="sm" color="gray.600">
-            {status.description}
-          </Text>
-        </Box>
+                <Badge
+                  fontSize="lg"
+                  px={4}
+                  py={2}
+                  borderRadius="full"
+                  colorScheme={
+                    status.color === 'green.500' ? 'green' :
+                    status.color === 'orange.500' ? 'orange' :
+                    status.color === 'yellow.500' ? 'yellow' :
+                    status.color === 'red.500' ? 'red' :
+                    status.color === 'purple.500' ? 'purple' : 'gray'
+                  }
+                >
+                  {status.label}
+                </Badge>
+                <Text mt={2} fontSize="sm" color="gray.600" textAlign="center">
+                  {status.description}
+                </Text>
+              </Box>
 
-        <Divider borderColor="gray.200" />
+              <Divider borderColor="gray.200" />
 
-        {/* Progress Steps */}
-        <Box>
+              {/* Progress Steps */}
+              <Box>
           <Text fontWeight="600" fontSize="sm" color="gray.500" textTransform="uppercase" letterSpacing="wider" mb={4}>
             Transaction Progress
           </Text>
