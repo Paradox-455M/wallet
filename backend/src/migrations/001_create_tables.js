@@ -67,6 +67,25 @@ const createTables = async () => {
       )
     `);
 
+    // Create transaction_files table (encrypted file storage)
+    await query(`
+      CREATE TABLE IF NOT EXISTS transaction_files (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        size_bytes BIGINT NOT NULL,
+        enc_key BYTEA NOT NULL,
+        enc_iv BYTEA NOT NULL,
+        enc_tag BYTEA NOT NULL,
+        enc_blob BYTEA NOT NULL,
+        file_type VARCHAR(20) DEFAULT 'seller',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await query('CREATE INDEX IF NOT EXISTS idx_transaction_files_tx_id ON transaction_files(transaction_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_transaction_files_created_at ON transaction_files(created_at DESC)');
+
     // Create indexes
     await query('CREATE INDEX IF NOT EXISTS idx_buyer_email ON transactions(buyer_email)');
     await query('CREATE INDEX IF NOT EXISTS idx_seller_email ON transactions(seller_email)');

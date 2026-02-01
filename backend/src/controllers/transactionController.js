@@ -243,7 +243,10 @@ class TransactionController {
           });
         } catch (error) {
           console.error('Error storing encrypted file:', error);
-          res.status(500).json({ error: 'Failed to store encrypted file' });
+          const message = process.env.NODE_ENV === 'development'
+            ? (error.message || 'Failed to store encrypted file')
+            : 'Failed to store encrypted file';
+          res.status(500).json({ error: message });
         }
       });
     } catch (error) {
@@ -271,6 +274,10 @@ class TransactionController {
       }
       if (!wantBuyerFile && req.user.email !== transaction.buyer_email) {
         return res.status(403).json({ error: 'Only the buyer can download the deliverable file' });
+      }
+      // Buyer can only download seller's deliverable file after payment
+      if (!wantBuyerFile && req.user.email === transaction.buyer_email && !transaction.payment_received) {
+        return res.status(403).json({ error: 'Payment is required before you can download the file' });
       }
 
       const meta = await TransactionFile.findLatestMetadataByTransactionId(transactionId, fileType);

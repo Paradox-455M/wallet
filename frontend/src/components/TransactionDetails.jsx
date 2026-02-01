@@ -616,16 +616,22 @@ const TransactionDetails = ({ transactionId }) => {
               </Box>
             )}
 
-            {/* File Upload - Show for seller if payment received but file not uploaded */}
+            {/* File Upload - Seller can upload before or after payment */}
             {currentUser?.email === transaction.seller_email && 
-             transaction.payment_received && 
+             transaction.status !== 'cancelled' && 
+             transaction.status !== 'refunded' &&
              !transaction.file_uploaded && (
               <VStack spacing={3} align="stretch">
                 <Alert status="info" borderRadius="md">
                   <AlertIcon />
                   <Box flex="1">
                     <Text fontWeight="bold">Upload File</Text>
-                    <Text fontSize="sm">Payment has been received. Please upload the file for the buyer. Max size: 25MB. Allowed: images, PDF, ZIP, text.</Text>
+                    <Text fontSize="sm">
+                      {transaction.payment_received
+                        ? 'Payment has been received. Please upload the file for the buyer.'
+                        : 'You can upload the file now. The buyer will be able to download it after they complete payment.'}
+                      {' '}Max size: 25MB. Allowed: images, PDF, ZIP, text.
+                    </Text>
                   </Box>
                 </Alert>
                 <Input
@@ -734,6 +740,16 @@ const TransactionDetails = ({ transactionId }) => {
             <Box flex="1">
               <Text fontWeight="bold">Payment Received</Text>
               <Text fontSize="sm">The buyer has completed payment. Please upload the file to complete the transaction.</Text>
+            </Box>
+          </Alert>
+        )}
+
+        {!transaction.payment_received && !transaction.file_uploaded && currentUser?.email === transaction.seller_email && (
+          <Alert status="info" borderRadius="md" variant="left-accent">
+            <AlertIcon />
+            <Box flex="1">
+              <Text fontWeight="bold">Upload anytime</Text>
+              <Text fontSize="sm">You can upload the file for the buyer now. They will get access to download it after they complete payment.</Text>
             </Box>
           </Alert>
         )}

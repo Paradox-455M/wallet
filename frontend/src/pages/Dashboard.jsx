@@ -442,6 +442,7 @@ const Dashboard = () => {
     if (status === 'AWAITING PAYMENT') {
       actions.push('Pay Now');
       actions.push('Cancel');
+      if (activeTab === 1 && !transaction.file_uploaded) actions.push('Upload Now'); // Seller can upload before payment
     } else if (status === 'AWAITING FILE' && activeTab === 1) { // Seller view
       actions.push('Upload Now');
     } else if (status === 'COMPLETE') {
