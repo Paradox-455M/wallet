@@ -19,6 +19,27 @@ type UseNotificationsResult = {
   refresh: () => void;
 };
 
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+/**
+ * Provides a React hook for fetching, polling, and managing user notifications.
+ *
+ * @param options - Optional configuration for the hook
+ * @param options.pollInterval - Polling interval in milliseconds for updating the unread count (defaults to 30000)
+ * @returns An object containing notification state and control methods:
+ *  - `notifications`: array of `NotificationItem` objects
+ *  - `unreadCount`: number of unread notifications
+ *  - `loading`: `true` while notifications are being fetched, `false` otherwise
+ *  - `error`: error message when fetching notifications failed, or `null`
+ *  - `fetchNotifications(unreadOnly?)`: fetches notifications; when `unreadOnly` is `true` only unread notifications are requested
+ *  - `fetchUnreadCount()`: updates the unread notification count
+ *  - `markAsRead(notificationId)`: marks a single notification as read and updates local state
+ *  - `markAllAsRead()`: marks all notifications as read and updates local state
+ *  - `refresh()`: refreshes notifications and unread count
+ */
 export function useNotifications(options: UseNotificationsOptions = {}): UseNotificationsResult {
   const { pollInterval = 30000 } = options;
   const queryClient = useQueryClient();
