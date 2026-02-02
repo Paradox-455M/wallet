@@ -27,6 +27,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AUTH_API_PATH = '/api/auth';
 
+/**
+ * Accesses the current authentication context for the calling component.
+ *
+ * @returns The current AuthContextValue containing authentication state and actions.
+ * @throws Error if there is no surrounding AuthProvider.
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -35,6 +41,13 @@ export function useAuth() {
   return context;
 }
 
+/**
+ * Provides authentication state and actions to descendant components.
+ *
+ * Manages current user, loading, authentication status, and error state; persists and reads the auth token from localStorage; exposes methods for login, registration, logout, OAuth initiation and callback handling, error clearing, and fetching the current user.
+ *
+ * @returns A React provider element that supplies authentication state and actions to its children.
+ */
 export function AuthProvider({ children }: PropsWithChildren) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
