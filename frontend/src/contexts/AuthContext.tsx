@@ -1,0 +1,195 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type PropsWithChildren,
+} from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AuthUser } from '../types/auth';
+import { getCurrentUser, loginUser, registerUser } from '../api/auth';
+
+type AuthContextValue = {
+  currentUser: AuthUser | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  register: (email: string, password: string, fullName: string) => Promise<AuthUser>;
+  logout: () => void;
+  handleOAuthLogin: (provider: 'google' | 'github') => void;
+  handleOAuthCallback: (token: string) => Promise<void>;
+  clearError: () => void;
+  fetchCurrentUser: (token?: string | null) => Promise<AuthUser | null>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+
+export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clearError = () => setError(null);
+
+  const fetchCurrentUser = useCallback(async (token?: string | null) => {
+    if (!token) {
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setLoading(false);
+      return null;
+    }
+    try {
+      const user = await queryClient.fetchQuery({
+        queryKey: ['auth', 'me'],
+        queryFn: getCurrentUser,
+        staleTime: 0,
+      });
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setError(null);
+      return user;
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to fetch user data.';
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      console.error('Failed to fetch current user:', err);
+      if (status === 401 || status === 403) {
+        try {
+          localStorage.removeItem('token');
+        } catch {
+          // ignore storage issues
+        }
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+      setError(message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [queryClient]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const handleStorage = () => {
+      const newToken = localStorage.getItem('token');
+      if (newToken !== token) {
+        fetchCurrentUser(newToken);
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    if (token) {
+      fetchCurrentUser(token);
+    } else {
+      setLoading(false);
+    }
+
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [fetchCurrentUser]);
+
+  const loginMutation = useMutation({
+    mutationFn: (args: { email: string; password: string }) => loginUser(args.email, args.password),
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: (args: { email: string; password: string; fullName: string }) =>
+      registerUser(args.email, args.password, args.fullName),
+  });
+
+  const login = async (email: string, password: string) => {
+    setLoading(true);
+    clearError();
+    try {
+      const { token, user } = await loginMutation.mutateAsync({ email, password });
+      localStorage.setItem('token', token);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setLoading(false);
+      return user;
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to login. Please check your credentials.';
+      console.error('Login failed:', err);
+      setError(message);
+      setLoading(false);
+      throw err;
+    }
+  };
+
+  const register = async (email: string, password: string, fullName: string) => {
+    setLoading(true);
+    clearError();
+    try {
+      const { token, user } = await registerMutation.mutateAsync({ email, password, fullName });
+      localStorage.setItem('token', token);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setLoading(false);
+      return user;
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to register. Please try again.';
+      console.error('Registration failed:', err);
+      setError(message);
+      setLoading(false);
+      throw err;
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+  };
+
+  const handleOAuthLogin = (provider: 'google' | 'github') => {
+    window.location.href = `/api/auth/${provider}`;
+  };
+
+  const handleOAuthCallback = useCallback(
+    async (token: string) => {
+      if (token) {
+        localStorage.setItem('token', token);
+        await fetchCurrentUser(token);
+      } else {
+        setError('OAuth login failed. No token received.');
+        setLoading(false);
+      }
+    },
+    [fetchCurrentUser]
+  );
+
+  const value: AuthContextValue = {
+    currentUser,
+    isAuthenticated,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    handleOAuthLogin,
+    handleOAuthCallback,
+    clearError,
+    fetchCurrentUser,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
