@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, type ChangeEvent, type DragEvent } from 'react';
+import type { AxiosProgressEvent } from 'axios';
 import {
   Box,
   VStack,
@@ -60,8 +61,16 @@ import Login from '../pages/Login';
 import Navbar from '../components/Navbar';
 import StarryBackground from '../components/StarryBackground';
 import Onboarding from '../components/Onboarding';
-import axios from 'axios';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiTransaction, BuyerData, SellerData, BuyerStats, SellerStats } from '../types/transactions';
+import {
+  cancelTransaction,
+  downloadTransactionFile,
+  getBuyerData,
+  getSellerData,
+  payTransaction,
+  uploadTransactionFile,
+} from '../api/transactions';
 
 type TransactionData = BuyerData | SellerData | ApiTransaction[];
 
@@ -200,7 +209,6 @@ const Dashboard = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [buyerData, setBuyerData] = useState<TransactionData>([]);
   const [sellerData, setSellerData] = useState<TransactionData>([]);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -220,6 +228,7 @@ const Dashboard = () => {
     monthlyGrowth: 0,
   });
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (realTimeUpdates) {
@@ -284,83 +293,107 @@ const Dashboard = () => {
     const totalAmount = allTransactions.reduce((sum, item) => sum + (parseFloat(String(item.amount)) || 0), 0);
     const activeCount = allTransactions.filter((item) => item.status === 'AWAITING FILE' || item.status === 'AWAITING PAYMENT').length;
 
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const previousMonthDate = new Date(currentYear, currentMonth - 1, 1);
+    const previousMonth = previousMonthDate.getMonth();
+    const previousYear = previousMonthDate.getFullYear();
+
+    const getMonthlyTotal = (month: number, year: number) =>
+      allTransactions.reduce((sum, item) => {
+        const createdAt = item.created_at ? new Date(item.created_at) : null;
+        if (!createdAt || Number.isNaN(createdAt.getTime())) {
+          return sum;
+        }
+        if (createdAt.getMonth() === month && createdAt.getFullYear() === year) {
+          return sum + (parseFloat(String(item.amount)) || 0);
+        }
+        return sum;
+      }, 0);
+
+    const currentTotal = getMonthlyTotal(currentMonth, currentYear);
+    const previousTotal = getMonthlyTotal(previousMonth, previousYear);
+    const monthlyGrowth =
+      previousTotal === 0 ? (currentTotal === 0 ? 0 : 100) : Math.round(((currentTotal - previousTotal) / Math.abs(previousTotal)) * 100);
+
     setAnalyticsData({
       totalTransactions: allTransactions.length,
       totalEarnings: totalAmount,
       activeTransactions: activeCount,
-      monthlyGrowth: Math.floor(Math.random() * 20) + 5,
+      monthlyGrowth,
     });
   }, [buyerData, sellerData]);
-
-  const fetchBuyerData = React.useCallback(async (opts: FetchOptions = {}) => {
-    try {
-      const token = localStorage.getItem('token');
-      const params: Record<string, string> = {};
-      if (opts.search && String(opts.search).trim()) params.search = String(opts.search).trim();
-      if (opts.status && opts.status !== 'ALL') params.status = opts.status;
-      const response = await axios.get<BuyerData>('/api/transactions/buyer-data', {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      setBuyerData(response.data);
-    } catch (error) {
-      console.error('Error fetching buyer data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch buyer data',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  }, [toast]);
-
-  const fetchSellerData = React.useCallback(async (opts: FetchOptions = {}) => {
-    try {
-      const token = localStorage.getItem('token');
-      const params: Record<string, string> = {};
-      if (opts.search && String(opts.search).trim()) params.search = String(opts.search).trim();
-      if (opts.status && opts.status !== 'ALL') params.status = opts.status;
-      const response = await axios.get<SellerData>('/api/transactions/seller-data', {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      setSellerData(response.data);
-    } catch (error) {
-      console.error('Error fetching seller data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch seller data',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  }, [toast]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchTerm), 400);
     return () => window.clearTimeout(t);
   }, [searchTerm]);
 
+  const buyerQuery = useQuery({
+    queryKey: ['buyer-data', debouncedSearch, statusFilter],
+    queryFn: () => getBuyerData({ search: debouncedSearch, status: statusFilter }),
+    enabled: isAuthenticated,
+  });
+
+  const sellerQuery = useQuery({
+    queryKey: ['seller-data', debouncedSearch, statusFilter],
+    queryFn: () => getSellerData({ search: debouncedSearch, status: statusFilter }),
+    enabled: isAuthenticated,
+  });
+
+  const isLoadingData = buyerQuery.isLoading || sellerQuery.isLoading;
+
+  const uploadMutation = useMutation({
+    mutationFn: (args: { id: string; file: File; onUploadProgress?: (event: AxiosProgressEvent) => void }) =>
+      uploadTransactionFile(args.id, args.file, args.onUploadProgress),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: payTransaction,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: cancelTransaction,
+  });
+
+  const downloadMutation = useMutation({
+    mutationFn: (transactionId: string) => downloadTransactionFile(transactionId, 'seller'),
+  });
+
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchBuyerData({ search: debouncedSearch, status: statusFilter }),
-          fetchSellerData({ search: debouncedSearch, status: statusFilter }),
-        ]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch, statusFilter, fetchBuyerData, fetchSellerData]);
+    if (buyerQuery.data) {
+      setBuyerData(buyerQuery.data);
+    }
+  }, [buyerQuery.data]);
+
+  useEffect(() => {
+    if (sellerQuery.data) {
+      setSellerData(sellerQuery.data);
+    }
+  }, [sellerQuery.data]);
+
+  useEffect(() => {
+    if (!buyerQuery.error) return;
+    toast({
+      title: 'Error',
+      description: 'Failed to fetch buyer data',
+      status: 'error',
+      duration: 5000,
+      isClosable: true,
+    });
+  }, [buyerQuery.error, toast]);
+
+  useEffect(() => {
+    if (!sellerQuery.error) return;
+    toast({
+      title: 'Error',
+      description: 'Failed to fetch seller data',
+      status: 'error',
+      duration: 5000,
+      isClosable: true,
+    });
+  }, [sellerQuery.error, toast]);
 
   const getBuyerStats = () => {
     const stats = getBuyerStatsFromData(buyerData);
@@ -427,7 +460,7 @@ const Dashboard = () => {
       date: transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : '—',
       time: transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString() : '—',
       actions: getTransactionActions(transaction),
-      createdAt: new Date(transaction.created_at || Date.now()),
+      createdAt: new Date(transaction.created_at || 0),
     }));
 
     const sellerTransactions = getTransactionsFromData(sellerData).map((transaction) => ({
@@ -440,7 +473,7 @@ const Dashboard = () => {
       date: transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : '—',
       time: transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString() : '—',
       actions: getTransactionActions(transaction),
-      createdAt: new Date(transaction.created_at || Date.now()),
+      createdAt: new Date(transaction.created_at || 0),
     }));
 
     const allTransactions = [...buyerTransactions, ...sellerTransactions];
@@ -498,16 +531,10 @@ const Dashboard = () => {
     setUploading(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/transactions/${taskId}/upload`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      await uploadMutation.mutateAsync({
+        id: taskId,
+        file,
         onUploadProgress: (progressEvent) => {
           const progress = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
           setUploadProgress(progress);
@@ -523,9 +550,9 @@ const Dashboard = () => {
       });
 
       if (activeTab === 1) {
-        fetchSellerData();
+        queryClient.invalidateQueries({ queryKey: ['seller-data'] });
       } else {
-        fetchBuyerData();
+        queryClient.invalidateQueries({ queryKey: ['buyer-data'] });
       }
 
       setUploadModalOpen(false);
@@ -605,16 +632,7 @@ const Dashboard = () => {
 
   const handlePayNow = async (transactionId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `/api/transactions/${transactionId}/pay`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await payMutation.mutateAsync(transactionId);
 
       toast({
         title: 'Success',
@@ -624,7 +642,7 @@ const Dashboard = () => {
         isClosable: true,
       });
 
-      fetchBuyerData();
+      queryClient.invalidateQueries({ queryKey: ['buyer-data'] });
     } catch (error) {
       console.error('Error processing payment:', error);
       toast({
@@ -639,16 +657,7 @@ const Dashboard = () => {
 
   const handleCancelTransaction = async (transactionId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `/api/transactions/${transactionId}/cancel`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await cancelMutation.mutateAsync(transactionId);
 
       toast({
         title: 'Success',
@@ -659,9 +668,9 @@ const Dashboard = () => {
       });
 
       if (activeTab === 0) {
-        fetchBuyerData();
+        queryClient.invalidateQueries({ queryKey: ['buyer-data'] });
       } else {
-        fetchSellerData();
+        queryClient.invalidateQueries({ queryKey: ['seller-data'] });
       }
     } catch (error) {
       console.error('Error cancelling transaction:', error);
@@ -677,14 +686,16 @@ const Dashboard = () => {
 
   const handleDownloadFile = async (transactionId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/transactions/${transactionId}/download`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      window.open(response.data.downloadUrl, '_blank');
+      const response = await downloadMutation.mutateAsync(transactionId);
+      const blob = new Blob([response.data]);
+      const disposition = response.headers['content-disposition'];
+      const match = disposition && disposition.match(/filename="?([^";]+)"?/);
+      const filename = match ? decodeURIComponent(match[1]) : 'download';
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(link.href);
 
       toast({
         title: 'Success',
@@ -863,11 +874,8 @@ const Dashboard = () => {
           <Button
             leftIcon={<RepeatIcon />}
             onClick={() => {
-              setLoading(true);
-              Promise.all([
-                fetchBuyerData({ search: debouncedSearch, status: statusFilter }),
-                fetchSellerData({ search: debouncedSearch, status: statusFilter }),
-              ]).finally(() => setLoading(false));
+              buyerQuery.refetch();
+              sellerQuery.refetch();
             }}
             bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
             color="white"
@@ -1062,7 +1070,7 @@ const Dashboard = () => {
                           </Box>
                         </Box>
                         <Box as="tbody">
-                          {loading ? (
+                          {isLoadingData ? (
                             Array.from({ length: 4 }).map((_, i) => (
                               <Box as="tr" key={`sk-buyer-${i}`}>
                                 <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
@@ -1255,7 +1263,7 @@ const Dashboard = () => {
                           </Box>
                         </Box>
                         <Box as="tbody">
-                          {loading ? (
+                          {isLoadingData ? (
                             Array.from({ length: 4 }).map((_, i) => (
                               <Box as="tr" key={`sk-seller-${i}`}>
                                 <Box as="td" px={6} py={4} borderBottom="1px solid" borderColor="whiteAlpha.100">
@@ -1403,7 +1411,7 @@ const Dashboard = () => {
                           </Box>
                         </Box>
                         <Box as="tbody">
-                          {loading ? (
+                          {isLoadingData ? (
                             Array.from({ length: 3 }).map((_, i) => (
                               <Box as="tr" key={`sk-history-${i}`}>
                                 {Array.from({ length: 8 }).map((__, j) => (

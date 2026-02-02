@@ -1,13 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import axios from 'axios';
+import { QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
-
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-axios.defaults.baseURL = apiBaseUrl;
-axios.defaults.headers.common['Content-Type'] = 'application/json';
+import { queryClient } from './lib/queryClient';
+import './index.css';
 
 const rootElement = document.getElementById('root');
 
@@ -18,7 +15,9 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>
 );

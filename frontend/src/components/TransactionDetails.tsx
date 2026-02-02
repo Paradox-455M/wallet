@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, type ChangeEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
+import type { AxiosProgressEvent } from 'axios';
 import {
   Box,
   Button,
@@ -19,13 +20,15 @@ import {
   useClipboard,
 } from '@chakra-ui/react';
 import { CheckCircleIcon, TimeIcon, CopyIcon, DownloadIcon, ArrowForwardIcon } from '@chakra-ui/icons';
-import { loadStripe } from '@stripe/stripe-js';
-import axios from 'axios';
+import { loadStripe, type Stripe, type StripeElements } from '@stripe/stripe-js';
+import { Elements, ElementsConsumer, PaymentElement } from '@stripe/react-stripe-js';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import Navbar from './Navbar';
 import StarryBackground from './StarryBackground';
 import type { ApiTransaction } from '../types/transactions';
+import { downloadTransactionFile, getTransaction, uploadTransactionFile } from '../api/transactions';
 
 type TransactionDetailsProps = {
   transactionId: string;
@@ -35,12 +38,10 @@ type TransactionDetailsData = ApiTransaction & {
   client_secret?: string | null;
 };
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
+const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : null;
 
 const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
-  const [transaction, setTransaction] = useState<TransactionDetailsData | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -65,39 +66,43 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
     });
   };
 
-  const fetchTransaction = async () => {
-    try {
-      setFetchError(null);
-      const token = localStorage.getItem('token');
-      const { data } = await axios.get<TransactionDetailsData>(`/api/transactions/${transactionId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setTransaction(data);
-      return data;
-    } catch (error) {
-      const errorMessage =
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        (error as Error).message ||
-        'Failed to load transaction. You may need to sign in or the transaction may not exist.';
-      setFetchError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const transactionQuery = useQuery({
+    queryKey: ['transaction', transactionId],
+    queryFn: () => getTransaction(transactionId),
+    enabled: Boolean(transactionId),
+    refetchInterval: 10000,
+  });
+
+  const transaction = transactionQuery.data ?? null;
+  const loading = transactionQuery.isLoading;
+
+  const uploadMutation = useMutation({
+    mutationFn: (args: { id: string; file: File; onUploadProgress?: (event: AxiosProgressEvent) => void }) =>
+      uploadTransactionFile(args.id, args.file, args.onUploadProgress),
+    onSuccess: () => {
+      transactionQuery.refetch();
+    },
+  });
+
+  const fetchError = useMemo(() => {
+    if (!transactionQuery.error) return null;
+    return (
+      (transactionQuery.error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+      (transactionQuery.error as Error).message ||
+      'Failed to load transaction. You may need to sign in or the transaction may not exist.'
+    );
+  }, [transactionQuery.error]);
 
   useEffect(() => {
-    fetchTransaction();
-    const interval = window.setInterval(fetchTransaction, 10000);
-    return () => window.clearInterval(interval);
-  }, [transactionId]);
+    if (!fetchError) return;
+    toast({
+      title: 'Error',
+      description: fetchError,
+      status: 'error',
+      duration: 5000,
+      isClosable: true,
+    });
+  }, [fetchError, toast]);
 
   useEffect(() => {
     if (hasCheckedRedirect.current || !transactionId) return;
@@ -105,7 +110,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
     if (!redirectStatus) return;
     hasCheckedRedirect.current = true;
     if (redirectStatus === 'succeeded') {
-      fetchTransaction();
+      transactionQuery.refetch();
       setPaymentError(null);
       toast({
         title: 'Payment successful',
@@ -133,7 +138,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
       });
       setSearchParams({});
     }
-  }, [transactionId, searchParams, setSearchParams, toast]);
+  }, [transactionId, searchParams, setSearchParams, toast, transactionQuery]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -158,12 +163,9 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
     formData.append('file', selectedFile);
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/transactions/${transactionId}/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+      await uploadMutation.mutateAsync({
+        id: transactionId,
+        file: selectedFile,
         onUploadProgress: (e) => {
           if (e.total) setUploadProgress(Math.round((e.loaded * 100) / e.total));
         },
@@ -178,7 +180,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
         isClosable: true,
       });
 
-      fetchTransaction();
+      transactionQuery.refetch();
       setSelectedFile(null);
     } catch (error) {
       const errorMessage =
@@ -205,12 +207,26 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (stripe: Stripe | null, elements: StripeElements | null) => {
     setProcessingPayment(true);
     setPaymentError(null);
     try {
-      const data = await fetchTransaction();
-      const clientSecret = data?.client_secret;
+      if (!stripePromise) {
+        const message = 'Stripe public key is missing. Set VITE_STRIPE_PUBLIC_KEY to continue.';
+        setPaymentError(message);
+        toast({ title: 'Payment unavailable', description: message, status: 'error', duration: 5000, isClosable: true });
+        return;
+      }
+
+      if (!stripe || !elements) {
+        const message = 'Stripe could not be initialized. Please refresh and try again.';
+        setPaymentError(message);
+        toast({ title: 'Payment unavailable', description: message, status: 'error', duration: 5000, isClosable: true });
+        return;
+      }
+
+      const result = await transactionQuery.refetch();
+      const clientSecret = result.data?.client_secret;
       if (!clientSecret) {
         toast({
           title: 'Payment form loading',
@@ -219,28 +235,42 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
           duration: 5000,
           isClosable: true,
         });
-        setProcessingPayment(false);
         return;
       }
-      const stripe = await stripePromise;
-      if (!stripe) {
+
+      const confirmation = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
+
+      if (confirmation.error) {
+        const message = confirmation.error.message || 'Payment failed. Please try again.';
+        setPaymentError(message);
+        toast({ title: 'Payment failed', description: message, status: 'error', duration: 5000, isClosable: true });
+        return;
+      }
+
+      if (confirmation.paymentIntent?.status === 'succeeded') {
         toast({
-          title: 'Payment unavailable',
-          description: 'Stripe could not be loaded. Check your connection.',
-          status: 'error',
+          title: 'Payment successful',
+          description: 'Your payment has been received. Transaction will update shortly.',
+          status: 'success',
           duration: 5000,
           isClosable: true,
         });
-        setProcessingPayment(false);
-        return;
+        transactionQuery.refetch();
+      } else {
+        toast({
+          title: 'Payment processing',
+          description: 'Your payment is being processed. We will update the transaction status shortly.',
+          status: 'info',
+          duration: 5000,
+          isClosable: true,
+        });
       }
-      toast({
-        title: 'Payment ready',
-        description: 'Complete payment in the Stripe-hosted flow when available, or refresh to load the payment form.',
-        status: 'info',
-        duration: 5000,
-        isClosable: true,
-      });
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -262,15 +292,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
   const handleDownload = async (fileType: 'buyer' | 'seller' = 'seller') => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem('token');
-      const url =
-        fileType === 'buyer'
-          ? `/api/transactions/${transactionId}/download?file=buyer`
-          : `/api/transactions/${transactionId}/download`;
-      const response = await axios.get<Blob>(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        responseType: 'blob',
-      });
+      const response = await downloadTransactionFile(transactionId, fileType);
       const blob = new Blob([response.data]);
       const disposition = response.headers['content-disposition'];
       const match = disposition && disposition.match(/filename="?([^";]+)"?/);
@@ -287,7 +309,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
         duration: 3000,
         isClosable: true,
       });
-      fetchTransaction();
+      transactionQuery.refetch();
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -321,7 +343,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
             <Text fontWeight="semibold">Could not load transaction</Text>
             <Text fontSize="sm">{fetchError}</Text>
           </Alert>
-          <Button colorScheme="purple" onClick={() => { setLoading(true); setFetchError(null); fetchTransaction(); }}>
+          <Button colorScheme="purple" onClick={() => transactionQuery.refetch()}>
             Try again
           </Button>
           <Button as="a" href="/dashboard" variant="outline" colorScheme="gray">
@@ -551,7 +573,7 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
                       <Box>
                         <Text fontWeight="bold">Payment issue</Text>
                         <Text fontSize="sm">{paymentError}</Text>
-                        <Button size="sm" mt={2} colorScheme="red" variant="outline" onClick={() => { setPaymentError(null); fetchTransaction(); }}>
+                  <Button size="sm" mt={2} colorScheme="red" variant="outline" onClick={() => { setPaymentError(null); transactionQuery.refetch(); }}>
                           Dismiss & refresh
                         </Button>
                       </Box>
@@ -566,17 +588,40 @@ const TransactionDetails = ({ transactionId }: TransactionDetailsProps) => {
                         <Text fontSize="sm" color="gray.600" mb={2}>
                           Payment status: <Badge colorScheme="yellow">Pending</Badge> — Complete payment to continue.
                         </Text>
-                        <Button
-                          colorScheme="green"
-                          size="lg"
-                          leftIcon={<ArrowForwardIcon />}
-                          onClick={handlePayment}
-                          isLoading={processingPayment}
-                          loadingText="Opening payment..."
-                          isDisabled={processingPayment}
-                        >
-                          Pay ${parseFloat(String(transaction.amount)).toFixed(2)} Now
-                        </Button>
+                        {stripePromise && transaction.client_secret ? (
+                          <Elements stripe={stripePromise} options={{ clientSecret: transaction.client_secret }}>
+                            <VStack spacing={4} align="stretch">
+                              <PaymentElement />
+                              <ElementsConsumer>
+                                {({ stripe, elements }) => (
+                                  <Button
+                                    colorScheme="green"
+                                    size="lg"
+                                    leftIcon={<ArrowForwardIcon />}
+                                    onClick={() => handlePayment(stripe, elements)}
+                                    isLoading={processingPayment}
+                                    loadingText="Processing payment..."
+                                    isDisabled={processingPayment}
+                                  >
+                                    Pay ${parseFloat(String(transaction.amount)).toFixed(2)} Now
+                                  </Button>
+                                )}
+                              </ElementsConsumer>
+                            </VStack>
+                          </Elements>
+                        ) : (
+                          <Button
+                            colorScheme="green"
+                            size="lg"
+                            leftIcon={<ArrowForwardIcon />}
+                            onClick={() => handlePayment(null, null)}
+                            isLoading={processingPayment}
+                            loadingText="Opening payment..."
+                            isDisabled={processingPayment}
+                          >
+                            Pay ${parseFloat(String(transaction.amount)).toFixed(2)} Now
+                          </Button>
+                        )}
                         {!transaction.client_secret && (
                           <Text fontSize="xs" color="gray.500" mt={2}>
                             If the button doesn&apos;t work, refresh the page to load payment details.

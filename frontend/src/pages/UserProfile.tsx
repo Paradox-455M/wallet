@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -25,66 +25,44 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import StarryBackground from '../components/StarryBackground';
-import axios from 'axios';
 import type { AuthUser } from '../types/auth';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getCurrentUser, updateProfile } from '../api/auth';
 
 const UserProfile = () => {
   const { currentUser, isAuthenticated, loading: authLoading, fetchCurrentUser } = useAuth();
-  const [profile, setProfile] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
   const toast = useToast();
 
-  const loadProfile = useCallback(async () => {
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-    setLoadError(null);
-    setLoading(true);
-    setFullName(currentUser.fullName || currentUser.full_name || '');
-    try {
-      const token = localStorage.getItem('token');
-      const { data } = await axios.get<{ user: AuthUser }>('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProfile(data.user);
-      setFullName(data.user.fullName || data.user.full_name || '');
-    } catch (err) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to load profile';
-      setLoadError(message);
-      toast({
-        title: 'Error',
-        description: message,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser, toast]);
+  const queryClient = useQueryClient();
+  const profileQuery = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: getCurrentUser,
+    enabled: isAuthenticated,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
 
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    const user = profileQuery.data || currentUser;
+    if (user) {
+      setFullName(user.fullName || user.full_name || '');
+    }
+  }, [profileQuery.data, currentUser]);
 
   const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (saving) return;
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        '/api/auth/profile',
-        { fullName: fullName.trim() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await fetchCurrentUser(token);
-      setProfile((prev) => (prev ? { ...prev, fullName: fullName.trim() } : prev));
+      await updateMutation.mutateAsync(fullName.trim());
+      await fetchCurrentUser(localStorage.getItem('token'));
       toast({
         title: 'Profile updated',
         description: 'Your name has been updated.',
@@ -93,10 +71,11 @@ const UserProfile = () => {
         isClosable: true,
       });
     } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update profile';
       toast({
         title: 'Update failed',
-        description:
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update profile',
+        description: message,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -114,9 +93,11 @@ const UserProfile = () => {
     );
   }
 
-  const user = profile || currentUser;
+  const user = profileQuery.data || currentUser;
+  const loading = profileQuery.isLoading;
+  const loadError = profileQuery.error ? (profileQuery.error as Error).message : null;
   const createdAt = user?.createdAt || user?.created_at;
-  const transactionCount = user?.transactionCount ?? profile?.transactionCount ?? 0;
+  const transactionCount = user?.transactionCount ?? 0;
   const originalName = (user?.fullName || user?.full_name || '').trim();
   const canSave = fullName.trim().length > 0 && fullName.trim() !== originalName;
 
@@ -147,7 +128,7 @@ const UserProfile = () => {
               ) : loadError ? (
                 <VStack spacing={4} py={6}>
                   <Text color="red.300">{loadError}</Text>
-                  <Button colorScheme="purple" variant="outline" onClick={loadProfile}>
+                  <Button colorScheme="purple" variant="outline" onClick={() => profileQuery.refetch()}>
                     Retry
                   </Button>
                 </VStack>

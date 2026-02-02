@@ -2,11 +2,11 @@ import { Box, Heading, VStack, Text, HStack, Badge } from '@chakra-ui/react';
 
 type TransactionSectionProps = {
   title: string;
-  transactions?: unknown[];
+  transactions?: TransactionSectionItem[];
   emptyMessage: string;
 };
 
-type DummyTransaction = {
+export type TransactionSectionItem = {
   id: number;
   amount: string;
   status: 'active' | 'completed';
@@ -14,23 +14,7 @@ type DummyTransaction = {
   counterparty: string;
 };
 
-const TransactionSection = ({ title, emptyMessage }: TransactionSectionProps) => {
-  const dummyTransactions: DummyTransaction[] = [
-    {
-      id: 1,
-      amount: '$150',
-      status: 'active',
-      date: '2024-03-15',
-      counterparty: 'client@example.com',
-    },
-    {
-      id: 2,
-      amount: '$299',
-      status: 'completed',
-      date: '2024-03-14',
-      counterparty: 'supplier@example.com',
-    },
-  ];
+const TransactionSection = ({ title, emptyMessage, transactions = [] }: TransactionSectionProps) => {
 
   return (
     <Box
@@ -46,11 +30,11 @@ const TransactionSection = ({ title, emptyMessage }: TransactionSectionProps) =>
         {title}
       </Heading>
 
-      {dummyTransactions.length === 0 ? (
+      {transactions.length === 0 ? (
         <Text color="whiteAlpha.600">{emptyMessage}</Text>
       ) : (
         <VStack spacing={4} align="stretch">
-          {dummyTransactions.map((transaction) => (
+          {transactions.map((transaction) => (
             <Box key={transaction.id} p={4} bg="whiteAlpha.50" borderRadius="md" _hover={{ bg: 'whiteAlpha.100' }}>
               <HStack justify="space-between">
                 <VStack align="start" spacing={1}>

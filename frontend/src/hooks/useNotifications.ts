@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NotificationItem } from '../types/notifications';
+import { getNotifications, getUnreadCount, markAllNotificationsRead, markNotificationRead } from '../api/notifications';
 
 type UseNotificationsOptions = {
   pollInterval?: number;
@@ -18,98 +19,69 @@ type UseNotificationsResult = {
   refresh: () => void;
 };
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 export function useNotifications(options: UseNotificationsOptions = {}): UseNotificationsResult {
   const { pollInterval = 30000 } = options;
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => getNotifications(),
+    refetchInterval: pollInterval,
+  });
+
+  const unreadCountQuery = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: getUnreadCount,
+    refetchInterval: pollInterval,
+  });
+
+  const markAsReadMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: (_, notificationId) => {
+      queryClient.setQueryData<NotificationItem[]>(['notifications'], (prev = []) =>
+        prev.map((item) => (item.id === notificationId ? { ...item, read_at: new Date().toISOString() } : item))
+      );
+      queryClient.setQueryData<number>(['notifications', 'unread-count'], (count = 0) => Math.max(0, count - 1));
+    },
+  });
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      queryClient.setQueryData<NotificationItem[]>(['notifications'], (prev = []) =>
+        prev.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() }))
+      );
+      queryClient.setQueryData<number>(['notifications', 'unread-count'], 0);
+    },
+  });
 
   const fetchNotifications = useCallback(async (unreadOnly = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = unreadOnly ? { unread: 'true' } : {};
-      const { data } = await axios.get<NotificationItem[]>('/api/notifications', {
-        headers: getAuthHeaders(),
-        params,
-      });
-      setNotifications(Array.isArray(data) ? data : []);
-    } catch (err) {
-      const message =
-        (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error ||
-        (err as Error).message ||
-        'Failed to load notifications';
-      setError(message);
-      setNotifications([]);
-    } finally {
-      setLoading(false);
+    if (unreadOnly) {
+      const data = await getNotifications({ unread: true });
+      queryClient.setQueryData(['notifications'], data);
+      return;
     }
-  }, []);
+    await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  }, [queryClient]);
 
   const fetchUnreadCount = useCallback(async () => {
-    try {
-      const { data } = await axios.get<{ count?: number }>('/api/notifications/unread-count', {
-        headers: getAuthHeaders(),
-      });
-      setUnreadCount(data?.count ?? 0);
-    } catch {
-      setUnreadCount(0);
-    }
-  }, []);
-
-  const markAsRead = useCallback(async (notificationId: string) => {
-    try {
-      await axios.post(`/api/notifications/${notificationId}/read`, {}, { headers: getAuthHeaders() });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read_at: new Date().toISOString() } : n))
-      );
-      setUnreadCount((count) => Math.max(0, count - 1));
-    } catch (err) {
-      console.error('Failed to mark as read:', err);
-    }
-  }, []);
-
-  const markAllAsRead = useCallback(async () => {
-    try {
-      await axios.post('/api/notifications/read-all', {}, { headers: getAuthHeaders() });
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
-      );
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('Failed to mark all as read:', err);
-    }
-  }, []);
+    await queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+  }, [queryClient]);
 
   const refresh = useCallback(() => {
-    fetchNotifications();
-    fetchUnreadCount();
-  }, [fetchNotifications, fetchUnreadCount]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    const interval = window.setInterval(fetchUnreadCount, pollInterval);
-    return () => window.clearInterval(interval);
-  }, [fetchUnreadCount, pollInterval]);
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+  }, [queryClient]);
 
   return {
-    notifications,
-    unreadCount,
-    loading,
-    error,
+    notifications: notificationsQuery.data || [],
+    unreadCount: unreadCountQuery.data || 0,
+    loading: notificationsQuery.isLoading || unreadCountQuery.isLoading,
+    error: (notificationsQuery.error as Error | undefined)?.message || null,
     fetchNotifications,
     fetchUnreadCount,
-    markAsRead,
-    markAllAsRead,
+    markAsRead: (notificationId: string) => markAsReadMutation.mutateAsync(notificationId),
+    markAllAsRead: () => markAllAsReadMutation.mutateAsync(),
     refresh,
   };
 }

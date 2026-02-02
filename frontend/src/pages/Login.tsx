@@ -44,10 +44,15 @@ const Login = ({ onClose, modalMode }: LoginProps) => {
   const [emailError, setEmailError] = useState('');
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const textColor = modalMode ? 'white' : useColorModeValue('gray.800', 'white');
-  const inputBg = modalMode ? 'rgba(255,255,255,0.08)' : useColorModeValue('gray.50', 'gray.700');
-  const inputText = modalMode ? 'white' : useColorModeValue('gray.800', 'white');
-  const borderColor = modalMode ? 'rgba(255,255,255,0.18)' : useColorModeValue('gray.200', 'gray.600');
+  const baseTextColor = useColorModeValue('gray.800', 'white');
+  const baseInputBg = useColorModeValue('gray.50', 'gray.700');
+  const baseInputText = useColorModeValue('gray.800', 'white');
+  const baseBorderColor = useColorModeValue('gray.200', 'gray.600');
+
+  const textColor = modalMode ? 'white' : baseTextColor;
+  const inputBg = modalMode ? 'rgba(255,255,255,0.08)' : baseInputBg;
+  const inputText = modalMode ? 'white' : baseInputText;
+  const borderColor = modalMode ? 'rgba(255,255,255,0.18)' : baseBorderColor;
 
   useEffect(() => {
     clearError();
@@ -144,10 +149,6 @@ const Login = ({ onClose, modalMode }: LoginProps) => {
   }
 
   if (isAuthenticated) {
-    return null;
-  }
-
-  if (!modalMode) {
     return null;
   }
 
