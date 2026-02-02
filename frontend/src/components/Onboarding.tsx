@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -27,19 +27,19 @@ const Onboarding = () => {
   const totalSteps = 3;
 
   useEffect(() => {
-    // Check if user has seen onboarding before
     const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
     if (!hasSeenOnboarding && currentUser) {
-      // Show onboarding after a short delay
-      setTimeout(() => {
+      const timeoutId = window.setTimeout(() => {
         onOpen();
       }, 1000);
+      return () => window.clearTimeout(timeoutId);
     }
+    return undefined;
   }, [currentUser, onOpen]);
 
   const handleNext = () => {
     if (step < totalSteps) {
-      setStep(step + 1);
+      setStep((prev) => prev + 1);
     } else {
       handleComplete();
     }
@@ -62,7 +62,6 @@ const Onboarding = () => {
         <ModalCloseButton />
         <ModalBody p={8}>
           <VStack spacing={6} align="stretch">
-            {/* Progress Bar */}
             <Box>
               <Text fontSize="sm" color="gray.400" mb={2}>
                 Step {step} of {totalSteps}
@@ -70,7 +69,6 @@ const Onboarding = () => {
               <Progress value={(step / totalSteps) * 100} colorScheme="purple" borderRadius="full" />
             </Box>
 
-            {/* Step 1: Welcome */}
             {step === 1 && (
               <VStack spacing={4} align="stretch" textAlign="center">
                 <Icon as={CheckCircleIcon} w={16} h={16} color="purple.400" mx="auto" />
@@ -88,7 +86,6 @@ const Onboarding = () => {
               </VStack>
             )}
 
-            {/* Step 2: How It Works */}
             {step === 2 && (
               <VStack spacing={4} align="stretch">
                 <Text fontSize="2xl" fontWeight="bold" textAlign="center">
@@ -97,29 +94,48 @@ const Onboarding = () => {
                 <List spacing={3}>
                   <ListItem>
                     <ListIcon as={CheckCircleIcon} color="purple.400" />
-                    <Text as="span" fontWeight="bold">Create Transaction:</Text>
-                    <Text as="span" color="gray.300"> Set up a new escrow transaction with buyer and seller details</Text>
+                    <Text as="span" fontWeight="bold">
+                      Create Transaction:
+                    </Text>
+                    <Text as="span" color="gray.300">
+                      {' '}
+                      Set up a new escrow transaction with buyer and seller details
+                    </Text>
                   </ListItem>
                   <ListItem>
                     <ListIcon as={CheckCircleIcon} color="purple.400" />
-                    <Text as="span" fontWeight="bold">Payment:</Text>
-                    <Text as="span" color="gray.300"> Buyer pays securely through Stripe</Text>
+                    <Text as="span" fontWeight="bold">
+                      Payment:
+                    </Text>
+                    <Text as="span" color="gray.300">
+                      {' '}
+                      Buyer pays securely through Stripe
+                    </Text>
                   </ListItem>
                   <ListItem>
                     <ListIcon as={CheckCircleIcon} color="purple.400" />
-                    <Text as="span" fontWeight="bold">File Upload:</Text>
-                    <Text as="span" color="gray.300"> Seller uploads the file or delivers the service</Text>
+                    <Text as="span" fontWeight="bold">
+                      File Upload:
+                    </Text>
+                    <Text as="span" color="gray.300">
+                      {' '}
+                      Seller uploads the file or delivers the service
+                    </Text>
                   </ListItem>
                   <ListItem>
                     <ListIcon as={CheckCircleIcon} color="purple.400" />
-                    <Text as="span" fontWeight="bold">Completion:</Text>
-                    <Text as="span" color="gray.300"> Transaction completes automatically when both steps are done</Text>
+                    <Text as="span" fontWeight="bold">
+                      Completion:
+                    </Text>
+                    <Text as="span" color="gray.300">
+                      {' '}
+                      Transaction completes automatically when both steps are done
+                    </Text>
                   </ListItem>
                 </List>
               </VStack>
             )}
 
-            {/* Step 3: Quick Start */}
             {step === 3 && (
               <VStack spacing={4} align="stretch">
                 <Text fontSize="2xl" fontWeight="bold" textAlign="center">
@@ -127,7 +143,9 @@ const Onboarding = () => {
                 </Text>
                 <VStack spacing={3} align="stretch">
                   <Box bg="gray.700" p={4} borderRadius="lg">
-                    <Text fontWeight="bold" mb={2}>Quick Actions:</Text>
+                    <Text fontWeight="bold" mb={2}>
+                      Quick Actions:
+                    </Text>
                     <List spacing={2}>
                       <ListItem fontSize="sm" color="gray.300">
                         • Create a new transaction from the dashboard
@@ -149,14 +167,8 @@ const Onboarding = () => {
               </VStack>
             )}
 
-            {/* Navigation Buttons */}
             <HStack spacing={4} justify="space-between" mt={4}>
-              <Button
-                variant="ghost"
-                onClick={handleSkip}
-                color="gray.400"
-                _hover={{ color: 'white' }}
-              >
+              <Button variant="ghost" onClick={handleSkip} color="gray.400" _hover={{ color: 'white' }}>
                 Skip
               </Button>
               <Button

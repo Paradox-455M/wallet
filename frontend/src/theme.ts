@@ -35,7 +35,6 @@ const theme = extendTheme({
       body: {
         textAlign: 'left',
       },
-      /* Custom scrollbar - WebKit (Chrome, Safari, Edge) */
       '*::-webkit-scrollbar': {
         width: '8px',
         height: '8px',
@@ -54,7 +53,6 @@ const theme = extendTheme({
       '*::-webkit-scrollbar-corner': {
         bg: 'gray.800',
       },
-      /* Firefox - apply to html so scrollable areas inherit */
       html: {
         scrollbarWidth: 'thin',
         scrollbarColor: '#718096 #2D3748',

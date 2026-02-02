@@ -1,4 +1,4 @@
-import React from 'react';
+import { useMemo } from 'react';
 import {
   Box,
   Button,
@@ -16,16 +16,17 @@ import {
   Divider,
   Link as ChakraLink,
 } from '@chakra-ui/react';
-import { BellIcon, CheckIcon, CheckCircleIcon } from '@chakra-ui/icons';
+import { BellIcon, CheckIcon } from '@chakra-ui/icons';
 import { Link as RouterLink } from 'react-router-dom';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../contexts/AuthContext';
+import type { NotificationItem } from '../types/notifications';
 
-const formatTime = (dateStr) => {
+const formatTime = (dateStr?: string | null) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   const now = new Date();
-  const diffMs = now - date;
+  const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
@@ -38,15 +39,12 @@ const formatTime = (dateStr) => {
 
 const NotificationCenter = () => {
   const { isAuthenticated } = useAuth();
-  const {
-    notifications,
-    unreadCount,
-    loading,
-    markAsRead,
-    markAllAsRead,
-    refresh,
-  } = useNotifications({ pollInterval: 60000 });
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications({
+    pollInterval: 60000,
+  });
   const toast = useToast();
+
+  const visibleNotifications = useMemo(() => notifications.slice(0, 20), [notifications]);
 
   if (!isAuthenticated) return null;
 
@@ -59,6 +57,12 @@ const NotificationCenter = () => {
       duration: 2000,
       isClosable: true,
     });
+  };
+
+  const handleItemClick = async (notification: NotificationItem) => {
+    if (!notification.read_at) {
+      await markAsRead(notification.id);
+    }
   };
 
   return (
@@ -104,13 +108,7 @@ const NotificationCenter = () => {
               Notifications
             </Text>
             {unreadCount > 0 && (
-              <Button
-                size="xs"
-                variant="ghost"
-                colorScheme="purple"
-                leftIcon={<CheckIcon />}
-                onClick={handleMarkAll}
-              >
+              <Button size="xs" variant="ghost" colorScheme="purple" leftIcon={<CheckIcon />} onClick={handleMarkAll}>
                 Mark all read
               </Button>
             )}
@@ -126,38 +124,36 @@ const NotificationCenter = () => {
           </Box>
         ) : (
           <VStack align="stretch" spacing={0} divider={<Divider borderColor="whiteAlpha.100" />}>
-            {notifications.slice(0, 20).map((n) => (
+            {visibleNotifications.map((notification) => (
               <MenuItem
-                key={n.id}
+                key={notification.id}
                 as={Box}
                 py={3}
                 px={4}
-                bg={n.read_at ? 'transparent' : 'whiteAlpha.50'}
+                bg={notification.read_at ? 'transparent' : 'whiteAlpha.50'}
                 _hover={{ bg: 'whiteAlpha.100' }}
                 cursor="pointer"
-                onClick={() => {
-                  if (!n.read_at) markAsRead(n.id);
-                }}
+                onClick={() => handleItemClick(notification)}
               >
                 <ChakraLink
                   as={RouterLink}
-                  to={n.transaction_id ? `/transaction/${n.transaction_id}` : '/dashboard'}
+                  to={notification.transaction_id ? `/transaction/${notification.transaction_id}` : '/dashboard'}
                   _hover={{ textDecoration: 'none' }}
                   flex={1}
                   onClick={() => document.body.click?.()}
                 >
                   <VStack align="stretch" spacing={1}>
                     <HStack justify="space-between">
-                      <Text fontWeight={n.read_at ? 'normal' : 'semibold'} fontSize="sm" noOfLines={1}>
-                        {n.title}
+                      <Text fontWeight={notification.read_at ? 'normal' : 'semibold'} fontSize="sm" noOfLines={1}>
+                        {notification.title}
                       </Text>
                       <Text fontSize="xs" color="gray.400">
-                        {formatTime(n.created_at)}
+                        {formatTime(notification.created_at)}
                       </Text>
                     </HStack>
-                    {n.message && (
+                    {notification.message && (
                       <Text fontSize="xs" color="gray.400" noOfLines={2}>
-                        {n.message}
+                        {notification.message}
                       </Text>
                     )}
                   </VStack>

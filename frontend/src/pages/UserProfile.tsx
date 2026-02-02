@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import {
   Box,
   Button,
@@ -26,18 +26,18 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import StarryBackground from '../components/StarryBackground';
 import axios from 'axios';
-
+import type { AuthUser } from '../types/auth';
 
 const UserProfile = () => {
   const { currentUser, isAuthenticated, loading: authLoading, fetchCurrentUser } = useAuth();
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
   const toast = useToast();
 
-  const loadProfile = React.useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     if (!currentUser) {
       setLoading(false);
       return;
@@ -47,13 +47,14 @@ const UserProfile = () => {
     setFullName(currentUser.fullName || currentUser.full_name || '');
     try {
       const token = localStorage.getItem('token');
-      const { data } = await axios.get('/api/auth/me', {
+      const { data } = await axios.get<{ user: AuthUser }>('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setProfile(data.user);
       setFullName(data.user.fullName || data.user.full_name || '');
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to load profile';
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to load profile';
       setLoadError(message);
       toast({
         title: 'Error',
@@ -71,7 +72,7 @@ const UserProfile = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const handleSave = async (e) => {
+  const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (saving) return;
     setSaving(true);
@@ -83,7 +84,7 @@ const UserProfile = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       await fetchCurrentUser(token);
-      setProfile((p) => (p ? { ...p, fullName: fullName.trim() } : p));
+      setProfile((prev) => (prev ? { ...prev, fullName: fullName.trim() } : prev));
       toast({
         title: 'Profile updated',
         description: 'Your name has been updated.',
@@ -94,7 +95,8 @@ const UserProfile = () => {
     } catch (err) {
       toast({
         title: 'Update failed',
-        description: err.response?.data?.message || 'Failed to update profile',
+        description:
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update profile',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -155,7 +157,7 @@ const UserProfile = () => {
                     <Avatar
                       size="2xl"
                       name={user?.fullName || user?.email}
-                      src={user?.avatarUrl}
+                      src={user?.avatarUrl || undefined}
                       bg="purple.500"
                       border="4px solid"
                       borderColor="purple.400"
@@ -203,13 +205,7 @@ const UserProfile = () => {
                         />
                       </FormControl>
                       <HStack spacing={4}>
-                        <Button
-                          type="submit"
-                          colorScheme="purple"
-                          isLoading={saving}
-                          loadingText="Saving..."
-                          isDisabled={saving || !canSave}
-                        >
+                        <Button type="submit" colorScheme="purple" isLoading={saving} loadingText="Saving..." isDisabled={saving || !canSave}>
                           Save changes
                         </Button>
                         <Button as={RouterLink} to="/dashboard" variant="outline" colorScheme="whiteAlpha">

@@ -17,7 +17,7 @@ const stripThreeStdlibSourceMaps = () => ({
 });
 
 export default defineConfig({
-  plugins: [stripThreeStdlibSourceMaps(), react()],
+  plugins: [stripThreeStdlibSourceMaps(), react({ fastRefresh: false })],
   optimizeDeps: {
     exclude: ['three-stdlib'],
   },
@@ -27,6 +27,23 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+            three: ['three'],
+            'three-fiber': ['@react-three/fiber'],
+            'three-drei': ['@react-three/drei'],
+            'three-mesh-bvh': ['three-mesh-bvh'],
+            maath: ['maath'],
+          chakra: ['@chakra-ui/react', '@chakra-ui/icons', '@emotion/react', '@emotion/styled'],
+          stripe: ['@stripe/stripe-js'],
+          motion: ['framer-motion'],
+        },
       },
     },
   },

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -12,48 +12,70 @@ import {
   NumberInput,
   NumberInputField,
   Container,
-  Flex,
-  Spacer,
   HStack,
   Heading,
   Icon,
-  Avatar,
   SimpleGrid,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalBody,
+  useDisclosure,
+  Select,
+  Textarea,
+  InputGroup,
+  InputLeftElement,
+  Link as ChakraLink,
 } from '@chakra-ui/react';
 import { loadStripe } from '@stripe/stripe-js';
 import axios from 'axios';
 import { LockIcon, EmailIcon, EditIcon, InfoOutlineIcon } from '@chakra-ui/icons';
-import { useColorModeValue } from '@chakra-ui/react';
-import { Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure, Select, Textarea, InputGroup, InputLeftElement } from '@chakra-ui/react';
 import Login from '../pages/Login';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from './Navbar';
 import StarryBackground from './StarryBackground';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+type Role = 'buyer' | 'seller';
+
+type FormDataState = {
+  sellerEmail: string;
+  buyerEmail: string;
+  amount: string;
+  itemDescription: string;
+  currency: string;
+};
+
+type CreateTransactionPayload = {
+  amount: number;
+  itemDescription: string;
+  sellerEmail?: string;
+  buyerEmail?: string;
+};
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 
 const CreateTransaction = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
 
-  const [role, setRole] = useState('buyer'); // 'buyer' = I'm paying, 'seller' = I'm receiving
-  const [formData, setFormData] = useState({
+  const [role, setRole] = useState<Role>('buyer');
+  const [formData, setFormData] = useState<FormDataState>({
     sellerEmail: '',
     buyerEmail: '',
     amount: '',
     itemDescription: '',
-    currency: 'USD'
+    currency: 'USD',
   });
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAmountChange = (valueString) => {
-    setFormData(prev => ({ ...prev, amount: valueString }));
+  const handleAmountChange = (valueString: string) => {
+    setFormData((prev) => ({ ...prev, amount: valueString }));
   };
 
   const validateForm = () => {
@@ -75,11 +97,10 @@ const CreateTransaction = () => {
     return null;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (loading) return;
 
-    // Validate form
     const validationError = validateForm();
     if (validationError) {
       toast({
@@ -88,7 +109,7 @@ const CreateTransaction = () => {
         status: 'error',
         duration: 5000,
         isClosable: true,
-        position: 'top-right'
+        position: 'top-right',
       });
       return;
     }
@@ -102,65 +123,55 @@ const CreateTransaction = () => {
       }
 
       const amount = parseFloat(formData.amount);
-      if (isNaN(amount) || amount <= 0) {
+      if (Number.isNaN(amount) || amount <= 0) {
         throw new Error('Invalid amount');
       }
 
-      const payload = {
-        amount: amount,
-        itemDescription: formData.itemDescription.trim()
+      const payload: CreateTransactionPayload = {
+        amount,
+        itemDescription: formData.itemDescription.trim(),
       };
       if (role === 'buyer') {
         payload.sellerEmail = formData.sellerEmail.trim();
       } else {
         payload.buyerEmail = formData.buyerEmail.trim();
       }
-      const { data } = await axios.post('/api/transactions', payload, {
+      const { data } = await axios.post<{ transactionId?: string }>('/api/transactions', payload, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       toast({
         title: 'Transaction Created Successfully! 🎉',
-        description: role === 'buyer'
-          ? 'Redirecting to payment...'
-          : 'Share the transaction link with the buyer so they can pay.',
+        description:
+          role === 'buyer' ? 'Redirecting to payment...' : 'Share the transaction link with the buyer so they can pay.',
         status: 'success',
         duration: 3000,
         isClosable: true,
-        position: 'top-right'
+        position: 'top-right',
       });
 
       if (data.transactionId) {
-        setTimeout(() => {
+        window.setTimeout(() => {
           window.location.href = `/transaction/${data.transactionId}`;
         }, 1500);
       }
-
     } catch (error) {
-      let errorMessage = 'Failed to create transaction';
-      
-      if (error.response) {
-        // Server responded with error
-        errorMessage = error.response.data?.error || 
-                      error.response.data?.message || 
-                      `Server error: ${error.response.status}`;
-      } else if (error.request) {
-        // Request made but no response
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else {
-        // Error in request setup
-        errorMessage = error.message || errorMessage;
-      }
+      const message =
+        (error as { response?: { data?: { error?: string; message?: string } }; message?: string })?.response?.data?.error ||
+        (error as { response?: { data?: { error?: string; message?: string } }; message?: string })?.response?.data
+          ?.message ||
+        (error as Error).message ||
+        'Failed to create transaction';
 
       toast({
         title: 'Transaction Creation Failed',
-        description: errorMessage,
+        description: message,
         status: 'error',
         duration: 7000,
         isClosable: true,
-        position: 'top-right'
+        position: 'top-right',
       });
     } finally {
       setLoading(false);
@@ -172,20 +183,20 @@ const CreateTransaction = () => {
       <StarryBackground />
       <Navbar onLoginOpen={onOpen} />
       <Box position="relative" zIndex={1}>
-        <Container maxW="container.md" pt={{base: 20, md: 28}} pb={12} color="white">
+        <Container maxW="container.md" pt={{ base: 20, md: 28 }} pb={12} color="white">
           <VStack spacing={6} align="center">
             <Icon as={LockIcon} w={12} h={12} color="purple.300" />
             <Heading as="h1" size="2xl" textAlign="center" fontWeight="bold" color="white">
               Start a New Secure Transaction
             </Heading>
           </VStack>
-          
-          <Box 
+
+          <Box
             mt={10}
             bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
             backdropFilter="blur(20px)"
-            p={{base: 6, md: 10}} 
-            borderRadius="3xl" 
+            p={{ base: 6, md: 10 }}
+            borderRadius="3xl"
             boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
             border="1px solid"
             borderColor="whiteAlpha.200"
@@ -193,7 +204,7 @@ const CreateTransaction = () => {
             _hover={{
               transform: 'translateY(-4px) scale(1.02)',
               boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-              borderColor: 'purple.300'
+              borderColor: 'purple.300',
             }}
             transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
             position="relative"
@@ -210,7 +221,9 @@ const CreateTransaction = () => {
             <form onSubmit={handleSubmit}>
               <VStack spacing={6}>
                 <FormControl>
-                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">I am</FormLabel>
+                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                    I am
+                  </FormLabel>
                   <SimpleGrid columns={2} spacing={3}>
                     <Button
                       type="button"
@@ -242,7 +255,9 @@ const CreateTransaction = () => {
 
                 {role === 'buyer' ? (
                   <FormControl isRequired>
-                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Seller's Email</FormLabel>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                      Seller&apos;s Email
+                    </FormLabel>
                     <InputGroup>
                       <InputLeftElement pointerEvents="none">
                         <Icon as={EmailIcon} color="purple.300" />
@@ -254,7 +269,7 @@ const CreateTransaction = () => {
                         borderRadius="lg"
                         bg="rgba(255, 255, 255, 0.1)"
                         borderColor="whiteAlpha.200"
-                        _hover={{ borderColor: 'purple.300'}}
+                        _hover={{ borderColor: 'purple.300' }}
                         focusBorderColor="purple.300"
                         placeholder="seller@example.com"
                         _placeholder={{ color: 'purple.200' }}
@@ -267,7 +282,9 @@ const CreateTransaction = () => {
                   </FormControl>
                 ) : (
                   <FormControl isRequired>
-                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Buyer's Email</FormLabel>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                      Buyer&apos;s Email
+                    </FormLabel>
                     <InputGroup>
                       <InputLeftElement pointerEvents="none">
                         <Icon as={EmailIcon} color="purple.300" />
@@ -279,7 +296,7 @@ const CreateTransaction = () => {
                         borderRadius="lg"
                         bg="rgba(255, 255, 255, 0.1)"
                         borderColor="whiteAlpha.200"
-                        _hover={{ borderColor: 'purple.300'}}
+                        _hover={{ borderColor: 'purple.300' }}
                         focusBorderColor="purple.300"
                         placeholder="buyer@example.com"
                         _placeholder={{ color: 'purple.200' }}
@@ -293,7 +310,9 @@ const CreateTransaction = () => {
                 )}
 
                 <FormControl isRequired>
-                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Item/Service Description</FormLabel>
+                  <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                    Item/Service Description
+                  </FormLabel>
                   <InputGroup>
                     <InputLeftElement pointerEvents="none" alignItems="flex-start" pt={3}>
                       <Icon as={EditIcon} color="purple.300" />
@@ -304,7 +323,7 @@ const CreateTransaction = () => {
                       borderRadius="lg"
                       bg="rgba(255, 255, 255, 0.1)"
                       borderColor="whiteAlpha.200"
-                      _hover={{ borderColor: 'purple.300'}}
+                      _hover={{ borderColor: 'purple.300' }}
                       focusBorderColor="purple.300"
                       placeholder="e.g., Website design services, Digital artwork commission, Software license"
                       _placeholder={{ color: 'purple.200' }}
@@ -319,7 +338,9 @@ const CreateTransaction = () => {
 
                 <HStack spacing={4} w="full" alignItems="flex-start">
                   <FormControl isRequired flex={1}>
-                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Amount</FormLabel>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                      Amount
+                    </FormLabel>
                     <InputGroup>
                       <InputLeftElement pointerEvents="none">
                         <Icon as={InfoOutlineIcon} color="purple.300" />
@@ -327,18 +348,16 @@ const CreateTransaction = () => {
                       <NumberInput
                         min={0.01}
                         precision={2}
-                        value={formData.amount}
+                        value={formData.amount === '' ? undefined : Number(formData.amount)}
                         onChange={handleAmountChange}
                         w="full"
                       >
                         <NumberInputField
                           name="amount"
-                          size="lg"
                           borderRadius="lg"
                           bg="rgba(255, 255, 255, 0.1)"
                           borderColor="whiteAlpha.200"
-                          _hover={{ borderColor: 'purple.300'}}
-                          focusBorderColor="purple.300"
+                          _hover={{ borderColor: 'purple.300' }}
                           placeholder="e.g., 500"
                           _placeholder={{ color: 'purple.200' }}
                           pl={10}
@@ -349,23 +368,31 @@ const CreateTransaction = () => {
                   </FormControl>
 
                   <FormControl isRequired flex={1}>
-                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">Currency</FormLabel>
+                    <FormLabel fontSize="md" color="purple.200" fontWeight="normal">
+                      Currency
+                    </FormLabel>
                     <Select
                       name="currency"
                       size="lg"
                       borderRadius="lg"
                       bg="rgba(255, 255, 255, 0.1)"
                       borderColor="whiteAlpha.200"
-                      _hover={{ borderColor: 'purple.300'}}
+                      _hover={{ borderColor: 'purple.300' }}
                       focusBorderColor="purple.300"
                       value={formData.currency}
                       onChange={handleInputChange}
                       iconColor="purple.300"
                       color="white"
                     >
-                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="USD">USD - US Dollar</option>
-                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="EUR">EUR - Euro</option>
-                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="GBP">GBP - British Pound</option>
+                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="USD">
+                        USD - US Dollar
+                      </option>
+                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="EUR">
+                        EUR - Euro
+                      </option>
+                      <option style={{ backgroundColor: '#1a202c', color: 'white' }} value="GBP">
+                        GBP - British Pound
+                      </option>
                     </Select>
                   </FormControl>
                 </HStack>
@@ -379,7 +406,7 @@ const CreateTransaction = () => {
                   _hover={{
                     bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
+                    boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)',
                   }}
                   _active={{ transform: 'translateY(0px)' }}
                   _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
@@ -394,7 +421,11 @@ const CreateTransaction = () => {
                   {role === 'buyer' ? 'Create & Proceed to Payment' : 'Create Transaction (share link with buyer)'}
                 </Button>
                 <Text fontSize="xs" color="purple.200" textAlign="center">
-                  By clicking "Proceed", you agree to SecureEscrow's <Link as={Link} to="/terms-of-service" color="purple.100" _hover={{textDecoration: 'underline'}}>Terms of Service</Link>.
+                  By clicking &quot;Proceed&quot;, you agree to SecureEscrow&apos;s{' '}
+                  <ChakraLink as={RouterLink} to="/terms-of-service" color="purple.100" _hover={{ textDecoration: 'underline' }}>
+                    Terms of Service
+                  </ChakraLink>
+                  .
                 </Text>
               </VStack>
             </form>

@@ -1,4 +1,4 @@
-import React from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import {
   Box,
   Flex,
@@ -6,61 +6,67 @@ import {
   Text,
   Button,
   Link,
-  Spacer,
-  VStack,
   HStack,
   Icon,
   Progress,
-  Image,
   Container,
   SimpleGrid,
-  useColorModeValue,
   Grid,
   GridItem,
-  Input,
-  Textarea,
-  Avatar,
+  VStack,
 } from '@chakra-ui/react';
-import { LockIcon, CheckCircleIcon, StarIcon, EmailIcon, PhoneIcon } from '@chakra-ui/icons';
-import { FaUserCircle, FaShieldAlt, FaHandshake, FaFileContract, FaTwitter, FaFacebook, FaLinkedin, FaInstagram, FaBolt, FaGlobe, FaHeadset, FaUniversity, FaMoneyBillWave, FaRegLightbulb } from 'react-icons/fa';
+import { LockIcon, StarIcon } from '@chakra-ui/icons';
+import {
+  FaUserCircle,
+  FaShieldAlt,
+  FaHandshake,
+  FaFileContract,
+  FaTwitter,
+  FaFacebook,
+  FaLinkedin,
+  FaInstagram,
+  FaBolt,
+  FaGlobe,
+  FaHeadset,
+  FaUniversity,
+  FaRegLightbulb,
+} from 'react-icons/fa';
 import { IoShieldCheckmark, IoBarChart, IoPeople } from 'react-icons/io5';
 import { useAuth } from '../contexts/AuthContext';
-import Login from '../pages/Login';
-import { Modal, ModalOverlay, ModalContent, ModalBody, useDisclosure } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
-import StarryBackground from './StarryBackground';
+const StarryBackground = lazy(() => import('./StarryBackground'));
 
 const LandingPage = () => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect authenticated users to dashboard
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated && currentUser) {
       navigate('/dashboard');
     }
   }, [isAuthenticated, currentUser, navigate]);
 
-  // Don't render anything if authenticated - let useEffect handle the redirect
   if (isAuthenticated && currentUser) {
     return null;
   }
 
   return (
     <Box minH="100vh" bg="gray.900" position="relative" overflowX="hidden" w="100%">
-      <StarryBackground />
-      <Navbar onLoginOpen={onOpen} />
+      <Suspense fallback={null}>
+        <StarryBackground />
+      </Suspense>
+      <Navbar />
       <Box position="relative" zIndex={1}>
-        {/* Hero Section */}
-        <Container maxW="container.xl" pt={{base: 16, md: 24}} pb={{base:12, md:20}} color="white">
-          <Flex 
-            direction={{ base: 'column', lg: 'row' }} 
-            align="center" 
-            justify="space-between"
-          >
-            <VStack spacing={6} align={{ base: 'center', lg: 'flex-start' }} textAlign={{ base: 'center', lg: 'left' }} maxW={{ base: '100%', lg: '54%' }} mb={{ base: 10, lg: 0 }}>
+        <Container maxW="container.xl" pt={{ base: 16, md: 24 }} pb={{ base: 12, md: 20 }} color="white">
+          <Flex direction={{ base: 'column', lg: 'row' }} align="center" justify="space-between">
+            <VStack
+              spacing={6}
+              align={{ base: 'center', lg: 'flex-start' }}
+              textAlign={{ base: 'center', lg: 'left' }}
+              maxW={{ base: '100%', lg: '54%' }}
+              mb={{ base: 10, lg: 0 }}
+            >
               <Text as="span" fontSize="sm" fontWeight="600" color="purple.300" textTransform="uppercase" letterSpacing="wider">
                 Secure Escrow for Digital Goods
               </Text>
@@ -108,21 +114,21 @@ const LandingPage = () => {
               </HStack>
             </VStack>
 
-            <Box 
+            <Box
               bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
               backdropFilter="blur(20px)"
-              p={8} 
-              borderRadius="3xl" 
+              p={8}
+              borderRadius="3xl"
               boxShadow="0 8px 32px rgba(0, 0, 0, 0.3)"
               border="1px solid"
               borderColor="whiteAlpha.200"
               color="white"
-              w={{ base: '90%', sm: '80%', md: '450px' }} 
+              w={{ base: '90%', sm: '80%', md: '450px' }}
               mt={{ base: 10, lg: 0 }}
               _hover={{
                 transform: 'translateY(-4px) scale(1.02)',
                 boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                borderColor: 'purple.300'
+                borderColor: 'purple.300',
               }}
               transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
               position="relative"
@@ -138,46 +144,63 @@ const LandingPage = () => {
               />
               <HStack mb={6}>
                 <Icon as={LockIcon} w={6} h={6} color="purple.300" />
-                <Heading size="md" color="white">Secure Transaction</Heading>
+                <Heading size="md" color="white">
+                  Secure Transaction
+                </Heading>
               </HStack>
-              
+
               <VStack spacing={4} align="stretch">
                 <HStack>
                   <Icon as={FaUserCircle} w={6} h={6} color="blue.300" />
                   <Box>
-                    <Text fontSize="sm" color="gray.400">Buyer</Text>
-                    <Text fontWeight="bold" color="white">John D.</Text>
+                    <Text fontSize="sm" color="gray.400">
+                      Buyer
+                    </Text>
+                    <Text fontWeight="bold" color="white">
+                      John D.
+                    </Text>
                   </Box>
                 </HStack>
                 <HStack>
                   <Icon as={FaUserCircle} w={6} h={6} color="green.300" />
                   <Box>
-                    <Text fontSize="sm" color="gray.400">Seller</Text>
-                    <Text fontWeight="bold" color="white">Creative Designs Co.</Text>
+                    <Text fontSize="sm" color="gray.400">
+                      Seller
+                    </Text>
+                    <Text fontWeight="bold" color="white">
+                      Creative Designs Co.
+                    </Text>
                   </Box>
                 </HStack>
-                
+
                 <Box mt={4} pt={4} borderTopWidth="1px" borderColor="whiteAlpha.200">
-                  <Text fontSize="sm" color="gray.400">Transaction amount</Text>
-                  <Text fontSize="2xl" fontWeight="bold" color="white">$1,250.00</Text>
+                  <Text fontSize="sm" color="gray.400">
+                    Transaction amount
+                  </Text>
+                  <Text fontSize="2xl" fontWeight="bold" color="white">
+                    $1,250.00
+                  </Text>
                 </Box>
 
                 <Box mt={4}>
                   <Progress value={75} colorScheme="purple" size="sm" borderRadius="md" />
-                  <Text fontSize="xs" color="gray.400" mt={1}>75% complete - awaiting file upload</Text>
+                  <Text fontSize="xs" color="gray.400" mt={1}>
+                    75% complete - awaiting file upload
+                  </Text>
                 </Box>
               </VStack>
             </Box>
           </Flex>
         </Container>
 
-        {/* Trusted by Businesses Section */}
-        <Box py={{base:12, md:16}}>
+        <Box py={{ base: 12, md: 16 }}>
           <Container maxW="container.lg">
-            <VStack spacing={4} mb={{base:8, md:12}}>
-              <Text fontWeight="medium" color="gray.400" textAlign="center">Trusted by businesses and individuals worldwide</Text>
+            <VStack spacing={4} mb={{ base: 8, md: 12 }}>
+              <Text fontWeight="medium" color="gray.400" textAlign="center">
+                Trusted by businesses and individuals worldwide
+              </Text>
             </VStack>
-            <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={{base:8, md:10}} textAlign="center">
+            <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={{ base: 8, md: 10 }} textAlign="center">
               <Box
                 bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                 backdropFilter="blur(20px)"
@@ -189,7 +212,7 @@ const LandingPage = () => {
                 _hover={{
                   transform: 'translateY(-4px) scale(1.02)',
                   boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                  borderColor: 'purple.300'
+                  borderColor: 'purple.300',
                 }}
                 transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                 position="relative"
@@ -205,7 +228,9 @@ const LandingPage = () => {
                 />
                 <HStack justify="center" spacing={3}>
                   <Icon as={IoShieldCheckmark} w={8} h={8} color="purple.300" />
-                  <Text fontWeight="bold" fontSize="lg" color="white">256-bit Encryption</Text>
+                  <Text fontWeight="bold" fontSize="lg" color="white">
+                    256-bit Encryption
+                  </Text>
                 </HStack>
               </Box>
               <Box
@@ -219,7 +244,7 @@ const LandingPage = () => {
                 _hover={{
                   transform: 'translateY(-4px) scale(1.02)',
                   boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                  borderColor: 'purple.300'
+                  borderColor: 'purple.300',
                 }}
                 transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                 position="relative"
@@ -235,7 +260,9 @@ const LandingPage = () => {
                 />
                 <HStack justify="center" spacing={3}>
                   <Icon as={IoBarChart} w={8} h={8} color="purple.300" />
-                  <Text fontWeight="bold" fontSize="lg" color="white">10,000+ Transactions</Text>
+                  <Text fontWeight="bold" fontSize="lg" color="white">
+                    10,000+ Transactions
+                  </Text>
                 </HStack>
               </Box>
               <Box
@@ -249,7 +276,7 @@ const LandingPage = () => {
                 _hover={{
                   transform: 'translateY(-4px) scale(1.02)',
                   boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                  borderColor: 'purple.300'
+                  borderColor: 'purple.300',
                 }}
                 transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                 position="relative"
@@ -265,30 +292,48 @@ const LandingPage = () => {
                 />
                 <HStack justify="center" spacing={3}>
                   <Icon as={IoPeople} w={8} h={8} color="purple.300" />
-                  <Text fontWeight="bold" fontSize="lg" color="white">Global Support</Text>
+                  <Text fontWeight="bold" fontSize="lg" color="white">
+                    Global Support
+                  </Text>
                 </HStack>
               </Box>
             </SimpleGrid>
           </Container>
         </Box>
 
-        {/* How SecureEscrow Works Section */}
-        <Box py={{base:16, md:20}}>
+        <Box py={{ base: 16, md: 20 }}>
           <Container maxW="container.xl">
-            <VStack spacing={4} mb={{base:10, md:16}} textAlign="center">
+            <VStack spacing={4} mb={{ base: 10, md: 16 }} textAlign="center">
               <Heading color="white">How SecureEscrow works</Heading>
-              <Text fontSize="lg" color="gray.300">A simple 3-step process protects both buyers and sellers</Text>
+              <Text fontSize="lg" color="gray.300">
+                A simple 3-step process protects both buyers and sellers
+              </Text>
             </VStack>
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{base:8, md:10}}>
-              {[ 
-                { icon: FaHandshake, title: 'Buyer sends money', text: 'The buyer initiates the transaction by securely depositing funds into our escrow system. The money is held safely until the transaction is complete.', step: 1 },
-                { icon: FaFileContract, title: 'Seller uploads file', text: 'The seller securely uploads the digital goods to our platform. The files are encrypted and stored safely until the transaction is finalized.', step: 2 },
-                { icon: FaShieldAlt, title: 'Both get what they came for', text: 'Once both conditions are met, the buyer receives the files and the seller receives the payment. It\'s a win-win for everyone involved.', step: 3 },
-              ].map((item, index) => (
-                <Box 
-                  key={index} 
-                  textAlign="center" 
-                  p={8} 
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 8, md: 10 }}>
+              {[
+                {
+                  icon: FaHandshake,
+                  title: 'Buyer sends money',
+                  text: 'The buyer initiates the transaction by securely depositing funds into our escrow system. The money is held safely until the transaction is complete.',
+                  step: 1,
+                },
+                {
+                  icon: FaFileContract,
+                  title: 'Seller uploads file',
+                  text: 'The seller securely uploads the digital goods to our platform. The files are encrypted and stored safely until the transaction is finalized.',
+                  step: 2,
+                },
+                {
+                  icon: FaShieldAlt,
+                  title: 'Both get what they came for',
+                  text: 'Once both conditions are met, the buyer receives the files and the seller receives the payment. It\'s a win-win for everyone involved.',
+                  step: 3,
+                },
+              ].map((item) => (
+                <Box
+                  key={item.step}
+                  textAlign="center"
+                  p={8}
                   bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                   backdropFilter="blur(20px)"
                   borderRadius="3xl"
@@ -301,7 +346,7 @@ const LandingPage = () => {
                   _hover={{
                     transform: 'translateY(-4px) scale(1.02)',
                     boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                    borderColor: 'purple.300'
+                    borderColor: 'purple.300',
                   }}
                   transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                 >
@@ -313,24 +358,27 @@ const LandingPage = () => {
                     h="1px"
                     bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
                   />
-                  <Box 
-                      bg="linear-gradient(135deg, purple.500 0%, blue.500 100%)"
-                      color="white" 
-                      borderRadius="full" 
-                      w={10} h={10} 
-                      display="flex" 
-                      alignItems="center" 
-                      justifyContent="center" 
-                      fontSize="xl" 
-                      fontWeight="bold"
-                      mx="auto"
-                      mb={6}
-                      boxShadow="0 4px 20px rgba(147, 51, 234, 0.4)"
+                  <Box
+                    bg="linear-gradient(135deg, purple.500 0%, blue.500 100%)"
+                    color="white"
+                    borderRadius="full"
+                    w={10}
+                    h={10}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    fontSize="xl"
+                    fontWeight="bold"
+                    mx="auto"
+                    mb={6}
+                    boxShadow="0 4px 20px rgba(147, 51, 234, 0.4)"
                   >
-                      {item.step}
+                    {item.step}
                   </Box>
                   <Icon as={item.icon} w={16} h={16} mb={6} color="purple.300" />
-                  <Heading size="md" mb={4} color="white">{item.title}</Heading>
+                  <Heading size="md" mb={4} color="white">
+                    {item.title}
+                  </Heading>
                   <Text color="gray.300">{item.text}</Text>
                 </Box>
               ))}
@@ -338,24 +386,25 @@ const LandingPage = () => {
           </Container>
         </Box>
 
-        {/* Why Choose SecureEscrow Section */}
-        <Box py={{base:16, md:20}}>
+        <Box py={{ base: 16, md: 20 }}>
           <Container maxW="container.xl">
-            <VStack spacing={4} mb={{base:10, md:16}} textAlign="center">
+            <VStack spacing={4} mb={{ base: 10, md: 16 }} textAlign="center">
               <Heading color="white">Why choose SecureEscrow?</Heading>
-              <Text fontSize="lg" color="gray.300">Built for security, designed for simplicity</Text>
+              <Text fontSize="lg" color="gray.300">
+                Built for security, designed for simplicity
+              </Text>
             </VStack>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{base:6, md:8}}>
-              {[ 
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 6, md: 8 }}>
+              {[
                 { icon: FaShieldAlt, title: 'No scams', text: 'Eliminate the risk of fraud. Funds are only released when both parties fulfill their obligations.' },
                 { icon: FaBolt, title: 'Fast payouts', text: 'Sellers receive their money quickly through multiple payout options.' },
                 { icon: FaRegLightbulb, title: 'Simple process', text: 'Our intuitive interface makes managing escrow transactions effortless.' },
                 { icon: FaHeadset, title: '24/7 Support', text: 'Our dedicated support team is available around the clock to assist you.' },
                 { icon: FaGlobe, title: 'Global reach', text: 'Conduct secure transactions with anyone, anywhere in the world.' },
                 { icon: FaUniversity, title: 'Military-grade security', text: 'Your data and transactions are protected with bank-level encryption.' },
-              ].map((feature, index) => (
+              ].map((feature) => (
                 <Box
-                  key={index}
+                  key={feature.title}
                   p={8}
                   bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                   backdropFilter="blur(20px)"
@@ -367,7 +416,7 @@ const LandingPage = () => {
                   _hover={{
                     transform: 'translateY(-4px) scale(1.02)',
                     boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                    borderColor: 'purple.300'
+                    borderColor: 'purple.300',
                   }}
                   transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                   position="relative"
@@ -382,7 +431,9 @@ const LandingPage = () => {
                     bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
                   />
                   <Icon as={feature.icon} w={12} h={12} mb={5} color="purple.300" />
-                  <Heading size="md" mb={3} color="white">{feature.title}</Heading>
+                  <Heading size="md" mb={3} color="white">
+                    {feature.title}
+                  </Heading>
                   <Text color="gray.300">{feature.text}</Text>
                 </Box>
               ))}
@@ -390,22 +441,23 @@ const LandingPage = () => {
           </Container>
         </Box>
 
-        {/* Testimonials Section */}
-        <Box py={{base:16, md:20}}>
+        <Box py={{ base: 16, md: 20 }}>
           <Container maxW="container.xl">
-            <VStack spacing={4} mb={{base:10, md:16}} textAlign="center">
+            <VStack spacing={4} mb={{ base: 10, md: 16 }} textAlign="center">
               <Heading color="white">What our users say</Heading>
-              <Text fontSize="lg" color="gray.300">Trusted by businesses and individuals worldwide</Text>
+              <Text fontSize="lg" color="gray.300">
+                Trusted by businesses and individuals worldwide
+              </Text>
             </VStack>
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{base:8, md:10}}>
-              {[ 
-                { name: 'Sarah Johnson', role: 'Freelance Designer', text: 'SecureEscrow has given me peace of mind... I know I\'ll get paid.', avatar: FaUserCircle },
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 8, md: 10 }}>
+              {[
+                { name: 'Sarah Johnson', role: 'Freelance Designer', text: "SecureEscrow has given me peace of mind... I know I'll get paid.", avatar: FaUserCircle },
                 { name: 'Michael Chen', role: 'Small Business Owner', text: 'Incredibly easy to use, eliminated payment disputes. Highly recommended!', avatar: FaUserCircle },
                 { name: 'David Rodriguez', role: 'Online Course Creator', text: 'Transformed how I sell courses. Builds trust, and I get paid instantly.', avatar: FaUserCircle },
-              ].map((testimonial, index) => (
-                <Box 
-                  key={index} 
-                  p={8} 
+              ].map((testimonial) => (
+                <Box
+                  key={testimonial.name}
+                  p={8}
                   bg="linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)"
                   backdropFilter="blur(20px)"
                   borderRadius="3xl"
@@ -417,7 +469,7 @@ const LandingPage = () => {
                   _hover={{
                     transform: 'translateY(-4px) scale(1.02)',
                     boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)',
-                    borderColor: 'purple.300'
+                    borderColor: 'purple.300',
                   }}
                   transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                   position="relative"
@@ -432,11 +484,19 @@ const LandingPage = () => {
                     bg="linear-gradient(90deg, transparent 0%, purple.400 50%, transparent 100%)"
                   />
                   <Icon as={testimonial.avatar} w={16} h={16} mb={4} color="purple.300" mx="auto" />
-                  <Heading size="md" mb={1} color="white">{testimonial.name}</Heading>
-                  <Text fontSize="sm" color="gray.400" mb={4}>{testimonial.role}</Text>
-                  <Text fontStyle="italic" color="gray.300" mb={4}>"{testimonial.text}"</Text>
+                  <Heading size="md" mb={1} color="white">
+                    {testimonial.name}
+                  </Heading>
+                  <Text fontSize="sm" color="gray.400" mb={4}>
+                    {testimonial.role}
+                  </Text>
+                  <Text fontStyle="italic" color="gray.300" mb={4}>
+                    &quot;{testimonial.text}&quot;
+                  </Text>
                   <HStack justify="center">
-                    {[...Array(5)].map((_, i) => <Icon key={i} as={StarIcon} color="yellow.400" />)}
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Icon key={i} as={StarIcon} color="yellow.400" />
+                    ))}
                   </HStack>
                 </Box>
               ))}
@@ -444,102 +504,147 @@ const LandingPage = () => {
           </Container>
         </Box>
 
-        {/* Ready to Transact Section */}
-        <Box py={{base:16, md:24}} color="white">
+        <Box py={{ base: 16, md: 24 }} color="white">
           <Container maxW="container.md" textAlign="center">
-            <Heading size={{base:'xl', md:'2xl'}} mb={4}>Ready to transact with confidence?</Heading>
-            <Text fontSize={{base:'lg', md:'xl'}} mb={8} color="gray.300">Join thousands of satisfied users who trust SecureEscrow.</Text>
+            <Heading size={{ base: 'xl', md: '2xl' }} mb={4}>
+              Ready to transact with confidence?
+            </Heading>
+            <Text fontSize={{ base: 'lg', md: 'xl' }} mb={8} color="gray.300">
+              Join thousands of satisfied users who trust SecureEscrow.
+            </Text>
             <HStack spacing={4} justify="center">
               <Button
-                  as={Link}
-                  href="/create-transaction"
-                  bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
-                  color="white"
-                  size="lg"
-                  px={10}
-                  _hover={{
-                    bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)'
-                  }}
-                  _active={{
-                    transform: 'translateY(0px)'
-                  }}
-                  fontWeight="bold"
-                  borderRadius="xl"
-                  transition="all 0.3s"
+                as={Link}
+                href="/create-transaction"
+                bg="linear-gradient(135deg, #9333EA 0%, #4F46E5 100%)"
+                color="white"
+                size="lg"
+                px={10}
+                _hover={{
+                  bg: 'linear-gradient(135deg, #7C3AED 0%, #4338CA 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(147, 51, 234, 0.4)',
+                }}
+                _active={{ transform: 'translateY(0px)' }}
+                fontWeight="bold"
+                borderRadius="xl"
+                transition="all 0.3s"
               >
-                  Start Transaction
+                Start Transaction
               </Button>
-              <Button
-                  variant="outline"
-                  borderColor="white"
-                  color="white"
-                  size="lg"
-                  px={10}
-                  _hover={{ bg: 'rgba(255,255,255,0.1)' }}
-              >
-                  Contact Sales
+              <Button variant="outline" borderColor="white" color="white" size="lg" px={10} _hover={{ bg: 'rgba(255,255,255,0.1)' }}>
+                Contact Sales
               </Button>
             </HStack>
           </Container>
         </Box>
 
-        {/* Footer */}
-        <Box bg="gray.800" color="gray.400" py={{base:10, md:16}}>
+        <Box bg="gray.800" color="gray.400" py={{ base: 10, md: 16 }}>
           <Container maxW="container.xl">
-            <Grid templateColumns={{ base: '1fr', md: '2fr 1fr 1fr 1fr 1fr' }} gap={{base:8, md:6}}>
+            <Grid templateColumns={{ base: '1fr', md: '2fr 1fr 1fr 1fr 1fr' }} gap={{ base: 8, md: 6 }}>
               <GridItem>
                 <HStack spacing={2} mb={4}>
                   <Icon as={LockIcon} w={7} h={7} color="purple.300" />
-                  <Heading size="md" color="white">SecureEscrow</Heading>
+                  <Heading size="md" color="white">
+                    SecureEscrow
+                  </Heading>
                 </HStack>
-                <Text fontSize="sm" mb={4}>Secure digital transactions worldwide.</Text>
+                <Text fontSize="sm" mb={4}>
+                  Secure digital transactions worldwide.
+                </Text>
                 <HStack spacing={4}>
-                  <Link href="#"><Icon as={FaTwitter} w={5} h={5} _hover={{color: 'white'}} /></Link>
-                  <Link href="#"><Icon as={FaFacebook} w={5} h={5} _hover={{color: 'white'}} /></Link>
-                  <Link href="#"><Icon as={FaLinkedin} w={5} h={5} _hover={{color: 'white'}} /></Link>
-                  <Link href="#"><Icon as={FaInstagram} w={5} h={5} _hover={{color: 'white'}} /></Link>
+                  <Link href="#">
+                    <Icon as={FaTwitter} w={5} h={5} _hover={{ color: 'white' }} />
+                  </Link>
+                  <Link href="#">
+                    <Icon as={FaFacebook} w={5} h={5} _hover={{ color: 'white' }} />
+                  </Link>
+                  <Link href="#">
+                    <Icon as={FaLinkedin} w={5} h={5} _hover={{ color: 'white' }} />
+                  </Link>
+                  <Link href="#">
+                    <Icon as={FaInstagram} w={5} h={5} _hover={{ color: 'white' }} />
+                  </Link>
                 </HStack>
               </GridItem>
 
               <GridItem>
-                <Heading size="sm" color="white" mb={4}>PRODUCT</Heading>
+                <Heading size="sm" color="white" mb={4}>
+                  PRODUCT
+                </Heading>
                 <VStack align="start" spacing={2} fontSize="sm">
-                  <Link href="#" _hover={{color: 'white'}}>Features</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Pricing</Link>
-                  <Link href="#" _hover={{color: 'white'}}>API</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Integrations</Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Features
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Pricing
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    API
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Integrations
+                  </Link>
                 </VStack>
               </GridItem>
 
               <GridItem>
-                <Heading size="sm" color="white" mb={4}>COMPANY</Heading>
+                <Heading size="sm" color="white" mb={4}>
+                  COMPANY
+                </Heading>
                 <VStack align="start" spacing={2} fontSize="sm">
-                  <Link href="#" _hover={{color: 'white'}}>About</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Blog</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Careers</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Press</Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    About
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Blog
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Careers
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Press
+                  </Link>
                 </VStack>
               </GridItem>
 
               <GridItem>
-                <Heading size="sm" color="white" mb={4}>LEGAL</Heading>
+                <Heading size="sm" color="white" mb={4}>
+                  LEGAL
+                </Heading>
                 <VStack align="start" spacing={2} fontSize="sm">
-                  <Link href="#" _hover={{color: 'white'}}>Privacy</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Terms</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Cookie Policy</Link>
-                  <Link href="#" _hover={{color: 'white'}}>GDPR</Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Privacy
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Terms
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Cookie Policy
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    GDPR
+                  </Link>
                 </VStack>
               </GridItem>
 
               <GridItem>
-                <Heading size="sm" color="white" mb={4}>SUPPORT</Heading>
+                <Heading size="sm" color="white" mb={4}>
+                  SUPPORT
+                </Heading>
                 <VStack align="start" spacing={2} fontSize="sm">
-                  <Link href="#" _hover={{color: 'white'}}>Help Center</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Contact Us</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Status</Link>
-                  <Link href="#" _hover={{color: 'white'}}>Security</Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Help Center
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Contact Us
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Status
+                  </Link>
+                  <Link href="#" _hover={{ color: 'white' }}>
+                    Security
+                  </Link>
                 </VStack>
               </GridItem>
             </Grid>
@@ -549,30 +654,6 @@ const LandingPage = () => {
           </Container>
         </Box>
       </Box>
-
-      {/* Login Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" motionPreset="scale">
-        <ModalOverlay bg="rgba(0,0,0,0.6)" backdropFilter="blur(6px)" />
-        <ModalContent
-          bg="rgba(30, 32, 48, 0.95)"
-          borderRadius="2xl"
-          boxShadow="2xl"
-          p={{ base: 0, md: 2 }}
-          maxW="420px"
-          mx="auto"
-          color="white"
-          position="relative"
-        >
-          <Box position="absolute" top={4} right={4} zIndex={2}>
-            <Button onClick={onClose} variant="ghost" colorScheme="whiteAlpha" size="sm" borderRadius="full" _hover={{ bg: 'whiteAlpha.300' }}>
-              &#10005;
-            </Button>
-          </Box>
-          <ModalBody p={{ base: 4, md: 8 }}>
-            <Login onClose={onClose} modalMode />
-          </ModalBody>
-        </ModalContent>
-      </Modal>
     </Box>
   );
 };
