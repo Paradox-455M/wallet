@@ -1,21 +1,12 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useParams, Navigate } from 'react-router-dom';
-import {
-  ChakraProvider,
-  Box,
-  Button,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalBody,
-  useDisclosure,
-  Spinner,
-} from '@chakra-ui/react';
+import { ChakraProvider, Box, Button, Modal, ModalOverlay, ModalContent, ModalBody, Spinner } from '@chakra-ui/react';
 import theme from './theme';
 import LandingPage from './components/LandingPage';
 import Login from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import { useUiStore } from './store/ui';
 
 const CreateTransaction = lazy(() => import('./components/CreateTransaction'));
 const TransactionDetails = lazy(() => import('./components/TransactionDetails'));
@@ -61,9 +52,11 @@ const AppContent = ({ onOpen, onClose, isOpen }: AppContentProps) => {
           <Route
             path="/create-transaction"
             element={
-              <Suspense fallback={<RouteFallback />}>
-                <CreateTransaction />
-              </Suspense>
+              <ProtectedRoute>
+                <Suspense fallback={<RouteFallback />}>
+                  <CreateTransaction />
+                </Suspense>
+              </ProtectedRoute>
             }
           />
           <Route path="/transaction/:transactionId" element={<TransactionDetailsWrapper />} />
@@ -168,13 +161,13 @@ const AppContent = ({ onOpen, onClose, isOpen }: AppContentProps) => {
 };
 
 const App = () => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isLoginOpen, openLogin, closeLogin } = useUiStore();
 
   return (
     <Router>
       <ChakraProvider theme={theme}>
         <AuthProvider>
-          <AppContent onOpen={onOpen} onClose={onClose} isOpen={isOpen} />
+          <AppContent onOpen={openLogin} onClose={closeLogin} isOpen={isLoginOpen} />
         </AuthProvider>
       </ChakraProvider>
     </Router>

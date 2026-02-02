@@ -72,12 +72,15 @@ const MovingStars = () => {
     const animate = () => {
       setStars((prevStars) =>
         prevStars
-          .map((star) => ({
-            ...star,
-            x: star.x - star.speed,
-            y: star.y + (Math.random() - 0.5) * 0.5,
-            opacity: star.opacity + (Math.random() - 0.5) * 0.1,
-          }))
+          .map((star) => {
+            const nextOpacity = Math.max(0, Math.min(1, star.opacity + (Math.random() - 0.5) * 0.1));
+            return {
+              ...star,
+              x: star.x - star.speed,
+              y: star.y + (Math.random() - 0.5) * 0.5,
+              opacity: nextOpacity,
+            };
+          })
           .map((star) => {
             if (star.x < -50) {
               return {
@@ -136,12 +139,15 @@ const SubtleBubbles = () => {
     const animate = () => {
       setBubbles((prevBubbles) =>
         prevBubbles
-          .map((bubble) => ({
-            ...bubble,
-            x: bubble.x + bubble.speed,
-            y: bubble.y + (Math.random() - 0.5) * 0.5,
-            opacity: bubble.opacity + (Math.random() - 0.5) * 0.05,
-          }))
+          .map((bubble) => {
+            const nextOpacity = Math.max(0, Math.min(1, bubble.opacity + (Math.random() - 0.5) * 0.05));
+            return {
+              ...bubble,
+              x: bubble.x + bubble.speed,
+              y: bubble.y + (Math.random() - 0.5) * 0.5,
+              opacity: nextOpacity,
+            };
+          })
           .map((bubble) => {
             if (bubble.x > window.innerWidth + 50) {
               return {

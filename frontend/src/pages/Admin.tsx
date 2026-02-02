@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import {
   Box,
   Button,
@@ -20,10 +20,11 @@ import {
   AlertIcon,
 } from '@chakra-ui/react';
 import { Link as RouterLink } from 'react-router-dom';
-import axios from 'axios';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '../components/Navbar';
 import StarryBackground from '../components/StarryBackground';
 import type { ApiTransaction } from '../types/transactions';
+import { cancelAdminTransaction, getAdminTransactions, refundTransaction } from '../api/admin';
 
 const statusColor = (status: string, paymentReceived?: boolean, fileUploaded?: boolean) => {
   if (status === 'completed') return 'green';
@@ -44,45 +45,44 @@ const statusLabel = (transaction: ApiTransaction) => {
 };
 
 const Admin = () => {
-  const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchList = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const params = statusFilter ? { status: statusFilter } : {};
-      const { data } = await axios.get<{ transactions?: ApiTransaction[] }>('/api/admin/transactions', {
-        headers: { Authorization: `Bearer ${token}` },
-        params,
-      });
-      setTransactions(data.transactions || []);
-    } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        (err as Error).message ||
-        'Failed to load transactions';
-      toast({ title: 'Error', description: msg, status: 'error', duration: 5000, isClosable: true });
-      setTransactions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, toast]);
+  const transactionsQuery = useQuery({
+    queryKey: ['admin-transactions', statusFilter],
+    queryFn: () => getAdminTransactions(statusFilter || undefined),
+  });
 
   useEffect(() => {
-    setLoading(true);
-    fetchList();
-  }, [fetchList]);
+    if (!transactionsQuery.error) return;
+    const msg =
+      (transactionsQuery.error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+      (transactionsQuery.error as Error).message ||
+      'Failed to load transactions';
+    toast({ title: 'Error', description: msg, status: 'error', duration: 5000, isClosable: true });
+  }, [transactionsQuery.error, toast]);
+
+  const cancelMutation = useMutation({
+    mutationFn: cancelAdminTransaction,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+    },
+  });
+
+  const refundMutation = useMutation({
+    mutationFn: refundTransaction,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-transactions'] });
+    },
+  });
 
   const handleCancel = async (id: string) => {
     setActionLoading(id);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/admin/transactions/${id}/cancel`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await cancelMutation.mutateAsync(id);
       toast({ title: 'Cancelled', description: 'Transaction cancelled.', status: 'success', duration: 3000, isClosable: true });
-      fetchList();
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -97,10 +97,8 @@ const Admin = () => {
   const handleRefund = async (id: string) => {
     setActionLoading(id);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`/api/transactions/${id}/refund`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await refundMutation.mutateAsync(id);
       toast({ title: 'Refunded', description: 'Refund processed.', status: 'success', duration: 3000, isClosable: true });
-      fetchList();
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -157,7 +155,7 @@ const Admin = () => {
                   Refunded
                 </option>
               </Select>
-              <Button colorScheme="purple" size="sm" onClick={() => { setLoading(true); fetchList(); }}>
+              <Button colorScheme="purple" size="sm" onClick={() => transactionsQuery.refetch()}>
                 Refresh
               </Button>
               <Button as={RouterLink} to="/dashboard" variant="outline" colorScheme="whiteAlpha" size="sm">
@@ -174,14 +172,14 @@ const Admin = () => {
               minW="0"
               sx={{ '&::-webkit-scrollbar': { height: '8px' } }}
             >
-              {loading ? (
+              {transactionsQuery.isLoading ? (
                 <Box py={12} textAlign="center">
                   <Spinner color="purple.400" size="lg" />
                   <Text color="gray.400" mt={4}>
                     Loading transactions...
                   </Text>
                 </Box>
-              ) : transactions.length === 0 ? (
+              ) : (transactionsQuery.data || []).length === 0 ? (
                 <Box py={12} textAlign="center">
                   <Text color="gray.400">No transactions found.</Text>
                 </Box>
@@ -213,7 +211,7 @@ const Admin = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {transactions.map((transaction) => (
+                    {(transactionsQuery.data || []).map((transaction) => (
                       <Tr key={transaction.id} borderBottom="1px" borderColor="whiteAlpha.100" _hover={{ bg: 'whiteAlpha.05' }}>
                         <Td color="purple.300" fontSize="xs" fontFamily="mono">
                           {String(transaction.id).slice(0, 8)}…

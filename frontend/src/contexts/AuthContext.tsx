@@ -6,8 +6,9 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import axios from 'axios';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AuthUser } from '../types/auth';
+import { getCurrentUser, loginUser, registerUser } from '../api/auth';
 
 type AuthContextValue = {
   currentUser: AuthUser | null;
@@ -49,6 +50,7 @@ export function useAuth() {
  * @returns A React provider element that supplies authentication state and actions to its children.
  */
 export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -64,27 +66,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return null;
     }
     try {
-      const response = await axios.get<{ user: AuthUser }>(`${AUTH_API_PATH}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const user = await queryClient.fetchQuery({
+        queryKey: ['auth', 'me'],
+        queryFn: getCurrentUser,
+        staleTime: 0,
       });
-      setCurrentUser(response.data.user);
+      setCurrentUser(user);
       setIsAuthenticated(true);
       setError(null);
-      return response.data.user;
+      return user;
     } catch (err) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to fetch user data.';
+      const status = (err as { response?: { status?: number } })?.response?.status;
       console.error('Failed to fetch current user:', err);
-      localStorage.removeItem('token');
-      setCurrentUser(null);
-      setIsAuthenticated(false);
+      if (status === 401 || status === 403) {
+        try {
+          localStorage.removeItem('token');
+        } catch {
+          // ignore storage issues
+        }
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
       setError(message);
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -106,15 +117,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => window.removeEventListener('storage', handleStorage);
   }, [fetchCurrentUser]);
 
+  const loginMutation = useMutation({
+    mutationFn: (args: { email: string; password: string }) => loginUser(args.email, args.password),
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: (args: { email: string; password: string; fullName: string }) =>
+      registerUser(args.email, args.password, args.fullName),
+  });
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     clearError();
     try {
-      const response = await axios.post<{ token: string; user: AuthUser }>(
-        `${AUTH_API_PATH}/login`,
-        { email, password }
-      );
-      const { token, user } = response.data;
+      const { token, user } = await loginMutation.mutateAsync({ email, password });
       localStorage.setItem('token', token);
       setCurrentUser(user);
       setIsAuthenticated(true);
@@ -135,11 +151,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setLoading(true);
     clearError();
     try {
-      const response = await axios.post<{ token: string; user: AuthUser }>(
-        `${AUTH_API_PATH}/register`,
-        { email, password, fullName }
-      );
-      const { token, user } = response.data;
+      const { token, user } = await registerMutation.mutateAsync({ email, password, fullName });
       localStorage.setItem('token', token);
       setCurrentUser(user);
       setIsAuthenticated(true);
@@ -160,10 +172,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     localStorage.removeItem('token');
     setCurrentUser(null);
     setIsAuthenticated(false);
+    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
   };
 
   const handleOAuthLogin = (provider: 'google' | 'github') => {
-    window.location.href = `${AUTH_API_PATH}/${provider}`;
+    window.location.href = `/api/auth/${provider}`;
   };
 
   const handleOAuthCallback = useCallback(

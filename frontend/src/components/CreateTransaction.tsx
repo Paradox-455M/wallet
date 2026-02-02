@@ -27,13 +27,13 @@ import {
   InputLeftElement,
   Link as ChakraLink,
 } from '@chakra-ui/react';
-import { loadStripe } from '@stripe/stripe-js';
-import axios from 'axios';
+import { useMutation } from '@tanstack/react-query';
 import { LockIcon, EmailIcon, EditIcon, InfoOutlineIcon } from '@chakra-ui/icons';
 import Login from '../pages/Login';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from './Navbar';
 import StarryBackground from './StarryBackground';
+import { createTransaction } from '../api/transactions';
 
 type Role = 'buyer' | 'seller';
 
@@ -52,8 +52,6 @@ type CreateTransactionPayload = {
   buyerEmail?: string;
 };
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
-
 const CreateTransaction = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAuthenticated, currentUser } = useAuth();
@@ -66,7 +64,9 @@ const CreateTransaction = () => {
     itemDescription: '',
     currency: 'USD',
   });
-  const [loading, setLoading] = useState(false);
+  const createMutation = useMutation({
+    mutationFn: createTransaction,
+  });
   const toast = useToast();
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -99,7 +99,7 @@ const CreateTransaction = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (loading) return;
+    if (createMutation.isPending) return;
 
     const validationError = validateForm();
     if (validationError) {
@@ -113,8 +113,6 @@ const CreateTransaction = () => {
       });
       return;
     }
-
-    setLoading(true);
 
     try {
       const token = localStorage.getItem('token');
@@ -136,11 +134,7 @@ const CreateTransaction = () => {
       } else {
         payload.buyerEmail = formData.buyerEmail.trim();
       }
-      const { data } = await axios.post<{ transactionId?: string }>('/api/transactions', payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const data = await createMutation.mutateAsync(payload);
 
       toast({
         title: 'Transaction Created Successfully! 🎉',
@@ -174,7 +168,7 @@ const CreateTransaction = () => {
         position: 'top-right',
       });
     } finally {
-      setLoading(false);
+      // React Query mutation handles loading state
     }
   };
 
@@ -410,8 +404,8 @@ const CreateTransaction = () => {
                   }}
                   _active={{ transform: 'translateY(0px)' }}
                   _focusVisible={{ boxShadow: '0 0 0 2px white, 0 0 0 4px rgba(147, 51, 234, 0.5)' }}
-                  isLoading={loading}
-                  isDisabled={loading}
+                  isLoading={createMutation.isPending}
+                  isDisabled={createMutation.isPending}
                   py={6}
                   fontSize="lg"
                   fontWeight="bold"
